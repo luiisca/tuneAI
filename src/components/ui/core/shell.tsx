@@ -285,30 +285,57 @@ const NavigationItem: React.FC<{ item: NavigationItemType }> = ({ item }) => {
   );
 };
 
-// function MobileNavigationContainer() {
-//   const { status } = useSession();
-//   if (status !== "authenticated") return null;
-//   return <MobileNavigation />;
-// }
-//
-// const MobileNavigation = () => {
-//   return (
-//     <>
-//       <nav
-//         className={classNames(
-//           "bottom-nav fixed bottom-0 z-30 -mx-4 flex w-full border border-t border-gray-200 bg-gray-50 bg-opacity-40 px-1 shadow backdrop-blur-md md:hidden",
-//           isEmbed && "hidden"
-//         )}
-//       >
-//         {navigation.map((item) => (
-//           <MobileNavigationItem key={item.name} item={item} />
-//         ))}
-//       </nav>
-//       {/* add padding to content for mobile navigation*/}
-//       <div className="block pt-12 md:hidden" />
-//     </>
-//   );
-// };
+const MobileNavigation = () => {
+  return (
+    <>
+      <nav
+        className={cn(
+          "fixed bottom-0 z-30 -mx-4 flex w-full border-t border-t-gray-200 bg-gray-50 bg-opacity-40 px-1 shadow backdrop-blur-md md:hidden",
+          "dark:border-t-slate-700 dark:bg-slate-900"
+        )}
+      >
+        {navigation.map((item) => (
+          <MobileNavigationItem key={item.name} item={item} />
+        ))}
+      </nav>
+      {/* add padding to content for mobile navigation*/}
+      <div className="block pt-12 md:hidden" />
+    </>
+  );
+};
+
+const MobileNavigationItem: React.FC<{
+  item: NavigationItemType;
+  isChild?: boolean;
+}> = (props) => {
+  const { item } = props;
+  const router = useRouter();
+  const current = isCurrent({ item, router });
+
+  return (
+    <Link
+      key={item.name}
+      href={item.href}
+      className={cn(
+        "relative my-2 min-w-0 flex-1 overflow-hidden rounded-md py-2 px-1 text-center text-xs font-medium text-gray-400 hover:bg-gray-200 hover:text-gray-700 focus:z-10 sm:text-sm",
+        "[&[aria-current='page']]:text-gray-900 dark:[&[aria-current='page']]:text-slate-50"
+      )}
+      aria-current={current ? "page" : undefined}
+    >
+      {item.icon && (
+        <item.icon
+          className={cn(
+            "mx-auto mb-1 block h-5 w-5 flex-shrink-0 text-center text-inherit [&[aria-current='page']]:text-gray-900",
+            "dark:[&[aria-current='page']]:text-slate-50"
+          )}
+          aria-hidden="true"
+          aria-current={current ? "page" : undefined}
+        />
+      )}
+      <span className="block truncate">{item.name}</span>
+    </Link>
+  );
+};
 
 function SideBar() {
   return (
@@ -410,10 +437,9 @@ function MainContainer({
   SettingsSidebarContainer: SettingsSidebarContainerProp = (
     <SettingsSidebarContainerDefault />
   ),
-  // MobileNavigationContainer: MobileNavigationContainerProp = (
-  //   <MobileNavigationContainer />
-  // ),
-  MobileNavigationContainer: MobileNavigationContainerProp,
+  MobileNavigationContainer: MobileNavigationContainerProp = (
+    <MobileNavigation />
+  ),
   TopNavContainer: TopNavContainerProp = <TopNav />,
   ...props
 }: LayoutProps) {
@@ -448,7 +474,7 @@ function MainContainer({
         )}
 
         {/* show bottom navigation for md and smaller (tablet and phones) on pages where back button doesn't exist */}
-        {/* {!props.backPath ? MobileNavigationContainerProp : null} */}
+        {!props.backPath ? MobileNavigationContainerProp : null}
       </div>
     </main>
   );

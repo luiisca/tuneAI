@@ -28,9 +28,27 @@ const MyApp: AppType<{ session: Session | null }> = ({
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <SessionProvider session={session}>
           <Component {...pageProps} />
+          <MusicPlayer />
         </SessionProvider>
       </ThemeProvider>
     </>
+  );
+};
+
+const MusicPlayer = () => {
+  return (
+    <div className="fixed bottom-0 hidden border-t border-t-slate-700 bg-slate-900">
+      {/* track cover */}
+      <div>
+        <div className="h-12 w-12 animate-pulse bg-slate-700">Image</div>
+        <div>
+          <p>song's name</p>
+          <p>artist name</p>
+        </div>
+      </div>
+      {/* controls */}
+      <div>Controls</div>
+    </div>
   );
 };
 
