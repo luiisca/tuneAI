@@ -24,7 +24,8 @@ module.exports = {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       colors: {
-        accent: "#1ed760",
+        accent: "#1db954",
+        accentBright: "#1ed760",
       },
     },
   },

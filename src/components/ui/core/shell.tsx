@@ -342,7 +342,7 @@ function SideBar() {
     <aside
       className={cn(
         "relative hidden w-14 flex-col border-r md:flex lg:w-56 lg:flex-shrink-0 lg:px-4",
-        "border-r-slate-200 bg-white dark:border-r-slate-700 dark:bg-slate-900"
+        "border-r-gray-100 bg-gray-50 dark:border-r-slate-700 dark:bg-slate-900"
       )}
     >
       <div className="flex h-0 flex-1 flex-col pt-3 pb-4 lg:pt-5">
@@ -369,7 +369,6 @@ function SideBar() {
         </span>
         <span className="hidden md:inline lg:hidden">
           {/* <UserDropdown small /> */}
-          <span>User</span>
         </span>
       </div>
     </aside>

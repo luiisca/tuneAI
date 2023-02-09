@@ -5,3 +5,7 @@
 :focus-visible {
   @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:focus-visible:ring-slate-400 dark:focus-visible:ring-offset-slate-900;
 }
+
+.disable-focus-visible {
+  @apply focus-visible:outline-none focus-visible:ring-transparent focus-visible:ring-offset-0 dark:focus-visible:ring-transparent dark:focus-visible:ring-offset-0;
+}

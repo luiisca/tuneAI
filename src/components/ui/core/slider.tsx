@@ -4,20 +4,32 @@ import { cn } from "@/utils/cn";
 
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
->(({ className, value, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & {
+    soundHovered?: boolean;
+  }
+>(({ className, value, soundHovered, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
     className={cn(
-      "relative flex w-full touch-none select-none items-center",
+      "group relative flex w-full touch-none select-none items-center",
       className
     )}
     {...props}
   >
     <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-      <SliderPrimitive.Range className="absolute h-full bg-slate-900  dark:bg-slate-400" />
+      <SliderPrimitive.Range
+        className={cn(
+          "absolute h-full bg-slate-900 dark:bg-slate-400 dark:group-hover:bg-accent",
+          soundHovered ? "dark:bg-accent" : ""
+        )}
+      />
     </SliderPrimitive.Track>
-    <SliderPrimitive.Thumb className="block h-3 w-3 rounded-full bg-slate-900 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-700 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:bg-slate-400 dark:focus:ring-slate-400 dark:focus:ring-offset-slate-900" />
+    <SliderPrimitive.Thumb
+      className={cn(
+        "disable-focus-visible block h-3 w-3 rounded-full bg-slate-900 opacity-0 transition-colors disabled:pointer-events-none disabled:opacity-50 group-hover:opacity-100 dark:bg-white",
+        soundHovered ? "opacity-100" : ""
+      )}
+    />
   </SliderPrimitive.Root>
 ));
 Slider.displayName = SliderPrimitive.Root.displayName;
