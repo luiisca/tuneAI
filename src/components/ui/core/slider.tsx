@@ -7,7 +7,7 @@ const Slider = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & {
     soundHovered?: boolean;
   }
->(({ className, value, soundHovered, ...props }, ref) => (
+>(({ className, soundHovered, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
     className={cn(
