@@ -24,6 +24,7 @@
     "class-variance-authority": "^0.4.0",
     "clsx": "^1.2.1",
     "lodash": "^4.17.21",
+    "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.109.0",
     "next": "13.1.6",
     "next-auth": "^4.19.0",

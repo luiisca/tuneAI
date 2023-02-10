@@ -1,13 +1,11 @@
 import type { GetServerSidePropsContext } from "next";
-import {
-  getServerSession,
-  type NextAuthOptions,
-  type DefaultSession,
-} from "next-auth";
-import DiscordProvider from "next-auth/providers/discord";
+import { getServerSession } from "next-auth";
+import type { NextAuthOptions, DefaultSession } from "next-auth";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { env } from "../env/server.mjs";
 import { prisma } from "./db";
+import SpotifyProvider from "next-auth/providers/spotify";
+import { WEBAPP_URL } from "@/utils/constants";
 
 /**
  * Module augmentation for `next-auth` types.
@@ -39,19 +37,36 @@ declare module "next-auth" {
  **/
 export const authOptions: NextAuthOptions = {
   callbacks: {
-    session({ session, user }) {
+    jwt(props) {
+      console.log("JWT", props);
+      return props;
+    },
+    session({ session, user, token }) {
+      console.log("SESION", session);
+      console.log("USER", user);
+      console.log("TOKEN", token);
       if (session.user) {
         session.user.id = user.id;
         // session.user.role = user.role; <-- put other properties on the session here
       }
       return session;
     },
+    async redirect({ url, baseUrl }) {
+      console.log("REDIRECT CALLBACK");
+      console.log("REDIRECT URL + BASEURL", url, baseUrl);
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same domain
+      else if (new URL(url).hostname === new URL(WEBAPP_URL as string).hostname)
+        return url;
+      return baseUrl;
+    },
   },
   adapter: PrismaAdapter(prisma),
   providers: [
-    DiscordProvider({
-      clientId: env.DISCORD_CLIENT_ID,
-      clientSecret: env.DISCORD_CLIENT_SECRET,
+    SpotifyProvider({
+      clientId: env.SPOTIFY_CLIENT_ID,
+      clientSecret: env.SPOTIFY_CLIENT_SECRET,
     }),
     /**
      * ...add more providers here

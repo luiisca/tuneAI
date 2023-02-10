@@ -1,4 +1,5 @@
 import { type AppType } from "next/app";
+import { useSession } from "next-auth/react";
 import { type Session } from "next-auth";
 import { Inter as FontSans } from "@next/font/google";
 import { SessionProvider } from "next-auth/react";
@@ -51,6 +52,7 @@ import { Button } from "@/components/ui/core/button";
 import { DEFAULT_SOUND, MIN_VOL_TO_MUTE } from "@/utils/constants";
 import { Progress } from "@/components/ui/progress";
 import { convertToSeconds, formatSongDuration } from "@/utils/song-time";
+import { getServerAuthSession } from "@/server/auth";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -234,6 +236,8 @@ const songs = [
 ];
 
 const MusicPlayer = () => {
+  const { status } = useSession();
+
   const {
     state: { scanning, loop, trackReady },
     dispatch,
@@ -291,266 +295,178 @@ const MusicPlayer = () => {
     updateSliderPosition(initSoundVal);
   }, []);
 
-  return (
-    <>
-      <div className="absolute top-0 right-0 z-50 flex space-x-2">
-        <Button
-          onClick={() => {
-            if (audioRef && audioRef.current && songs[0]) {
-              audioRef.current.src = songs[0].src;
-            }
-          }}
-        >
-          Load song
-        </Button>
-      </div>
-      <audio
-        ref={audioRef}
-        loop={loop}
-        onLoadStart={(e) => {
-          // console.log("ON LOAD START", e);
-          dispatch({ type: "SET_TRACK_READY", ready: false });
-        }}
-        onLoadedData={(e) => {
-          // console.log("ON LOADED DATA", e);
-          setDuration(e.target.duration);
-          setCrrSoundPerc(e.target.volume);
-        }}
-        onCanPlay={(e) => {
-          // console.log("ON CANPLAY", e);
-          dispatch({ type: "SET_TRACK_READY", ready: true });
-          if (audioRef.current) {
-            audioRef.current.play();
-          }
-          dispatch({ type: "TOGGLE_PLAY", playing: true });
-        }}
-        onTimeUpdate={(e) => {
-          // console.log("ON TIME UPDATE", e);
-          // console.log("duration", duration);
-          const percentage = e.target.currentTime / duration;
+  if (status !== "loading" && status !== "authenticated") return null;
 
-          // console.log("percentage", percentage);
-          setCrrSongPerc(percentage);
-          // updateSliderPosition(Math.floor(percentage));
-        }}
-        onWaiting={(e) => {
-          // console.log("ON WAITING", e);
-          dispatch({ type: "SET_TRACK_READY", ready: false });
-        }}
-        onEnded={(e) => {
-          // console.log("ON ENDED", e);
-          dispatch({ type: "TOGGLE_PLAY", playing: false });
-          // go to next song
-        }}
-        className="absolute top-0 left-0 z-50"
-      />
-      <div
-        className={cn("fixed right-0 bottom-[88px] z-40 w-full md:bottom-0")}
-      >
-        {/* mobile floating playing bar */}
-        <div
-          className={cn(
-            "relative mx-2 flex cursor-pointer flex-col justify-center rounded-lg border border-gray-100 bg-gray-50 p-2 backdrop-blur-0 dark:border-transparent dark:bg-slate-700 md:hidden"
-          )}
-          onClick={(e) => {
-            if (!e.target.closest("button")) {
-              setPlayerOpen(true);
-            }
-          }}
-        >
-          <div className="flex items-center space-x-2">
-            {/* track cover */}
-            <div className="mr-1 ">
-              <div className="h-10 w-10 animate-pulse rounded-md bg-slate-900"></div>
-            </div>
-            {/* Text */}
-            <div className="dark:slate-50 w-full text-sm">
-              <p className="font-bold">Song's name</p>
-              <p className="font-normal">Artist name</p>
-            </div>
-            {/* controls */}
-            <div className="absolute right-0 z-50 flex h-full">
-              <FavouriteBttn />
-              <PlayBttn
-                className={cn(
-                  "relative p-2",
-                  (scanning || trackReady === false) && "cursor-not-allowed"
-                )}
-                LoadingIcon={() => (
-                  <LoadingIcon
-                    className="top-2.5 left-0"
-                    svgClassName="w-9 h-9"
-                  />
-                )}
-                iconClassName="translate-x-0 fill-slate-900 dark:fill-white"
-              />
-            </div>
-          </div>
-          <Progress
-            value={crrSongPerc * 100}
-            className="absolute inset-x-2 bottom-0 h-0.5 w-auto"
-          />
+  if (status === "authenticated") {
+    return (
+      <>
+        <div className="absolute top-0 right-0 z-50 flex space-x-2">
+          <Button
+            onClick={() => {
+              if (audioRef && audioRef.current && songs[0]) {
+                audioRef.current.src = songs[0].src;
+              }
+            }}
+          >
+            Load song
+          </Button>
         </div>
+        <audio
+          ref={audioRef}
+          loop={loop}
+          onLoadStart={(e) => {
+            // console.log("ON LOAD START", e);
+            dispatch({ type: "SET_TRACK_READY", ready: false });
+          }}
+          onLoadedData={(e) => {
+            // console.log("ON LOADED DATA", e);
+            setDuration(e.target.duration);
+            setCrrSoundPerc(e.target.volume);
+          }}
+          onCanPlay={(e) => {
+            // console.log("ON CANPLAY", e);
+            dispatch({ type: "SET_TRACK_READY", ready: true });
+            if (audioRef.current) {
+              audioRef.current.play();
+            }
+            dispatch({ type: "TOGGLE_PLAY", playing: true });
+          }}
+          onTimeUpdate={(e) => {
+            // console.log("ON TIME UPDATE", e);
+            // console.log("duration", duration);
+            const percentage = e.target.currentTime / duration;
 
-        {/* mobile overlay player */}
-        <aside
-          className={cn(
-            "fixed inset-0 flex h-screen w-screen transform flex-col transition duration-200 ease-in-out md:hidden",
-            "bg-gradient-to-b from-gray-50 to-gray-100 p-3",
-            "dark:from-slate-800 dark:to-slate-900",
-            playerOpen ? "translate-y-0" : "translate-y-full"
-          )}
+            // console.log("percentage", percentage);
+            setCrrSongPerc(percentage);
+            // updateSliderPosition(Math.floor(percentage));
+          }}
+          onWaiting={(e) => {
+            // console.log("ON WAITING", e);
+            dispatch({ type: "SET_TRACK_READY", ready: false });
+          }}
+          onEnded={(e) => {
+            // console.log("ON ENDED", e);
+            dispatch({ type: "TOGGLE_PLAY", playing: false });
+            // go to next song
+          }}
+          className="absolute top-0 left-0 z-50"
+        />
+        <div
+          className={cn("fixed right-0 bottom-[88px] z-40 w-full md:bottom-0")}
         >
-          {/* close and more */}
-          <div className="mb-10 flex w-full items-center">
-            <button className="p-2" onClick={() => setPlayerOpen(false)}>
-              <ChevronDown className="h-8 w-8" />
-            </button>
-
-            <p className="dark:slate-50 w-full text-center text-sm font-bold">
-              Similar songs
-            </p>
-            {/* {similars && <p>Similar songs</p>} */}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger className="p-3">
-                <MoreHorizontal className="h-6 w-6" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="mr-3">
-                <DropdownMenuItem
-                  className="flex items-center space-x-3"
-                  onClick={() => showToast("Coming Soon!", "warning")}
-                >
-                  <ListPlus />
-                  <span className="font-bold">Add to Playlist</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="flex items-center space-x-3">
-                  <Disc />
-                  <span className="font-bold">View Album</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          {/* track cover */}
-          <div className="mb-6 h-full p-0">
-            <div className="h-full w-full animate-pulse rounded-2xl bg-slate-900" />
-          </div>
-          {/* title and favourite */}
-          <div className="mx-3 mb-4 flex items-center">
-            <div className="w-full">
-              {scanning ? (
-                <div className="flex flex-col space-y-1">
-                  <SkeletonText className="w-1/2 text-xl" />
-                  <SkeletonText className="w-1/3" />
-                </div>
-              ) : (
-                <>
-                  <p className="text-2xl font-bold">Song's name</p>
-                  <p className="font-normal">Artist name</p>
-                </>
-              )}
+          {/* mobile floating playing bar */}
+          <div
+            className={cn(
+              "relative mx-2 flex cursor-pointer flex-col justify-center rounded-lg border border-gray-100 bg-gray-50 p-2 backdrop-blur-0 dark:border-transparent dark:bg-slate-700 md:hidden"
+            )}
+            onClick={(e) => {
+              if (!e.target.closest("button")) {
+                setPlayerOpen(true);
+              }
+            }}
+          >
+            <div className="flex items-center space-x-2">
+              {/* track cover */}
+              <div className="mr-1 ">
+                <div className="h-10 w-10 animate-pulse rounded-md bg-slate-900"></div>
+              </div>
+              {/* Text */}
+              <div className="dark:slate-50 w-full text-sm">
+                <p className="font-bold">Song's name</p>
+                <p className="font-normal">Artist name</p>
+              </div>
+              {/* controls */}
+              <div className="absolute right-0 z-50 flex h-full">
+                <FavouriteBttn />
+                <PlayBttn
+                  className={cn(
+                    "relative p-2",
+                    (scanning || trackReady === false) && "cursor-not-allowed"
+                  )}
+                  LoadingIcon={() => (
+                    <LoadingIcon
+                      className="top-2.5 left-0"
+                      svgClassName="w-9 h-9"
+                    />
+                  )}
+                  iconClassName="translate-x-0 fill-slate-900 dark:fill-white"
+                />
+              </div>
             </div>
-            <FavouriteBttn className="p-3 pr-0" />
-          </div>
-
-          {/* mobile progress bar */}
-          <div className="mx-3 mb-5">
-            <Slider
-              max={1}
-              step={0.01}
-              value={[crrSongPerc]}
-              className="pt-5 pb-2"
-              onValueChange={(value) => {
-                if (audioRef.current && value[0] && duration) {
-                  // translate value to seconds
-                  audioRef.current.currentTime = convertToSeconds(
-                    duration,
-                    value[0]
-                  );
-                }
-              }}
+            <Progress
+              value={crrSongPerc * 100}
+              className="absolute inset-x-2 bottom-0 h-0.5 w-auto"
             />
-            <div className="flex justify-between text-[0.6875rem] dark:text-slate-50">
-              {scanning ? (
-                <>
-                  <SkeletonText className="w-8" />
-                  <SkeletonText className="w-8" />
-                </>
-              ) : (
-                <>
-                  <span className="block h-4">
-                    {duration &&
-                      formatSongDuration(
-                        convertToSeconds(duration, crrSongPerc)
-                      )}
-                  </span>
-                  <span>{duration && formatSongDuration(duration)}</span>
-                </>
-              )}
-            </div>
           </div>
-          {/* controls */}
-          <PlaybackControls />
-          {/* play in device and share buttons */}
-          <div className="flex justify-between">
-            <div
-              className={cn(
-                "p-2",
 
-                scanning && "fill-slate-400 text-slate-400"
-              )}
-            >
-              <MonitorSpeaker className="h-4 w-4" />
-            </div>
-            <div
-              className={cn("p-2", scanning && "fill-slate-400 text-slate-400")}
-            >
-              <Share2 className="h-4 w-4" />
-            </div>
-          </div>
-        </aside>
+          {/* mobile overlay player */}
+          <aside
+            className={cn(
+              "fixed inset-0 flex h-screen w-screen transform flex-col transition duration-200 ease-in-out md:hidden",
+              "bg-gradient-to-b from-gray-50 to-gray-100 p-3",
+              "dark:from-slate-800 dark:to-slate-900",
+              playerOpen ? "translate-y-0" : "translate-y-full"
+            )}
+          >
+            {/* close and more */}
+            <div className="mb-10 flex w-full items-center">
+              <button className="p-2" onClick={() => setPlayerOpen(false)}>
+                <ChevronDown className="h-8 w-8" />
+              </button>
 
-        {/* DESKTOP PLAYER */}
-        <div className="hidden h-24 border-t border-t-gray-100 bg-gray-50 p-4 dark:border-t-slate-700 dark:bg-slate-900 md:flex">
-          <div className="flex w-full items-center justify-start">
-            {/* track cover */}
-            <div className="h-14 w-14 flex-shrink-0 animate-pulse rounded-md bg-slate-500"></div>
-
-            {/* Text */}
-            <div className="dark:slate-50 mx-3.5 text-sm ">
-              <p>Song's name</p>
-              <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">
-                Artist name
+              <p className="dark:slate-50 w-full text-center text-sm font-bold">
+                Similar songs
               </p>
+              {/* {similars && <p>Similar songs</p>} */}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger className="p-3">
+                  <MoreHorizontal className="h-6 w-6" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="mr-3">
+                  <DropdownMenuItem
+                    className="flex items-center space-x-3"
+                    onClick={() => showToast("Coming Soon!", "warning")}
+                  >
+                    <ListPlus />
+                    <span className="font-bold">Add to Playlist</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="flex items-center space-x-3">
+                    <Disc />
+                    <span className="font-bold">View Album</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {/* track cover */}
+            <div className="mb-6 h-full p-0">
+              <div className="h-full w-full animate-pulse rounded-2xl bg-slate-900" />
+            </div>
+            {/* title and favourite */}
+            <div className="mx-3 mb-4 flex items-center">
+              <div className="w-full">
+                {scanning ? (
+                  <div className="flex flex-col space-y-1">
+                    <SkeletonText className="w-1/2 text-xl" />
+                    <SkeletonText className="w-1/3" />
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold">Song's name</p>
+                    <p className="font-normal">Artist name</p>
+                  </>
+                )}
+              </div>
+              <FavouriteBttn className="p-3 pr-0" />
             </div>
 
-            {/* favourite */}
-            <FavouriteBttn className="group" iconClassName="h-4 w-4" />
-          </div>
-          <div className="w-full ">
-            <PlaybackControls className="mb-2" />
-            <div className="flex space-x-2 text-[0.6875rem]">
-              {scanning ? (
-                <>
-                  <SkeletonText className="w-8 dark:bg-slate-700" />
-                </>
-              ) : (
-                <>
-                  <span>
-                    {duration &&
-                      formatSongDuration(
-                        convertToSeconds(duration, crrSongPerc)
-                      )}
-                  </span>
-                </>
-              )}
-
-              {/* desktop progress bar */}
+            {/* mobile progress bar */}
+            <div className="mx-3 mb-5">
               <Slider
-                className="h-4"
                 max={1}
                 step={0.01}
                 value={[crrSongPerc]}
+                className="pt-5 pb-2"
                 onValueChange={(value) => {
                   if (audioRef.current && value[0] && duration) {
                     // translate value to seconds
@@ -561,111 +477,206 @@ const MusicPlayer = () => {
                   }
                 }}
               />
-              {scanning ? (
-                <>
-                  <SkeletonText className="w-8 dark:bg-slate-700" />
-                </>
-              ) : (
-                <>
-                  <span>{duration && formatSongDuration(duration)}</span>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="mr-1 flex w-full items-center justify-end">
-            <button
-              className={cn("group p-2", scanning && "cursor-not-allowed")}
-              disabled={scanning}
-              onClick={() => {
-                showToast("Coming Soon!", "warning");
-              }}
-            >
-              <MonitorSpeaker
-                className={cn(
-                  "h-4 w-4",
-                  !scanning &&
-                    "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
-                  scanning && "text-slate-400"
+              <div className="flex justify-between text-[0.6875rem] dark:text-slate-50">
+                {scanning ? (
+                  <>
+                    <SkeletonText className="w-8" />
+                    <SkeletonText className="w-8" />
+                  </>
+                ) : (
+                  <>
+                    <span className="block h-4">
+                      {duration &&
+                        formatSongDuration(
+                          convertToSeconds(duration, crrSongPerc)
+                        )}
+                    </span>
+                    <span>{duration && formatSongDuration(duration)}</span>
+                  </>
                 )}
-              />
-            </button>
-            <div className="relative flex w-1/2 items-center">
+              </div>
+            </div>
+            {/* controls */}
+            <PlaybackControls />
+            {/* play in device and share buttons */}
+            <div className="flex justify-between">
+              <div
+                className={cn(
+                  "p-2",
+
+                  scanning && "fill-slate-400 text-slate-400"
+                )}
+              >
+                <MonitorSpeaker className="h-4 w-4" />
+              </div>
+              <div
+                className={cn(
+                  "p-2",
+                  scanning && "fill-slate-400 text-slate-400"
+                )}
+              >
+                <Share2 className="h-4 w-4" />
+              </div>
+            </div>
+          </aside>
+
+          {/* DESKTOP PLAYER */}
+          <div className="hidden h-24 border-t border-t-gray-100 bg-gray-50 p-4 dark:border-t-slate-700 dark:bg-slate-900 md:flex">
+            <div className="flex w-full items-center justify-start">
+              {/* track cover */}
+              <div className="h-14 w-14 flex-shrink-0 animate-pulse rounded-md bg-slate-500"></div>
+
+              {/* Text */}
+              <div className="dark:slate-50 mx-3.5 text-sm ">
+                <p>Song's name</p>
+                <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">
+                  Artist name
+                </p>
+              </div>
+
+              {/* favourite */}
+              <FavouriteBttn className="group" iconClassName="h-4 w-4" />
+            </div>
+            <div className="w-full ">
+              <PlaybackControls className="mb-2" />
+              <div className="flex space-x-2 text-[0.6875rem]">
+                {scanning ? (
+                  <>
+                    <SkeletonText className="w-8 dark:bg-slate-700" />
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      {duration &&
+                        formatSongDuration(
+                          convertToSeconds(duration, crrSongPerc)
+                        )}
+                    </span>
+                  </>
+                )}
+
+                {/* desktop progress bar */}
+                <Slider
+                  className="h-4"
+                  max={1}
+                  step={0.01}
+                  value={[crrSongPerc]}
+                  onValueChange={(value) => {
+                    if (audioRef.current && value[0] && duration) {
+                      // translate value to seconds
+                      audioRef.current.currentTime = convertToSeconds(
+                        duration,
+                        value[0]
+                      );
+                    }
+                  }}
+                />
+                {scanning ? (
+                  <>
+                    <SkeletonText className="w-8 dark:bg-slate-700" />
+                  </>
+                ) : (
+                  <>
+                    <span>{duration && formatSongDuration(duration)}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="mr-1 flex w-full items-center justify-end">
               <button
                 className={cn("group p-2", scanning && "cursor-not-allowed")}
-                onMouseEnter={() => setSoundHovered(true)}
-                onMouseLeave={() => setSoundHovered(false)}
                 disabled={scanning}
                 onClick={() => {
-                  if (crrSoundPerc <= MIN_VOL_TO_MUTE) {
-                    // come back to prev vol if user manually droppes volume to mutable levels
-                    setCrrSoundPerc(initSoundVal);
-                    if (audioRef.current) {
-                      audioRef.current.volume = initSoundVal;
-                    }
-                  } else {
-                    // save crr vol for next click to fall back to that value
-                    setInitSoundVal(crrSoundPerc);
-                    const newSoundVal = crrSoundPerc > 0 ? 0 : initSoundVal;
-                    setCrrSoundPerc(newSoundVal);
-                    if (audioRef.current) {
-                      console.log("newSoundVal", newSoundVal);
-                      audioRef.current.volume = newSoundVal;
-                    }
-                  }
+                  showToast("Coming Soon!", "warning");
                 }}
               >
-                {(() => {
-                  let SoundIcon =
-                    crrSoundPerc <= MIN_VOL_TO_MUTE
-                      ? VolumeX
-                      : crrSoundPerc > MIN_VOL_TO_MUTE && crrSoundPerc < 0.75
-                      ? Volume1
-                      : crrSoundPerc >= 0.75
-                      ? Volume2
-                      : null;
-
-                  if (SoundIcon) {
-                    return (
-                      <SoundIcon
-                        className={cn(
-                          "h-4 w-4",
-                          !scanning &&
-                            "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
-                          scanning && "text-slate-400"
-                        )}
-                      />
-                    );
-                  }
-                  return null;
-                })()}
+                <MonitorSpeaker
+                  className={cn(
+                    "h-4 w-4",
+                    !scanning &&
+                      "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
+                    scanning && "text-slate-400"
+                  )}
+                />
               </button>
-              {/* volume slider */}
-              <Slider
-                max={1}
-                step={0.01}
-                disabled={!trackReady}
-                value={[crrSoundPerc]}
-                onValueChange={(value) => {
-                  if (value[0] && audioRef.current) {
-                    // console.log("value[0]", value[0]);
-                    if (value[0] <= MIN_VOL_TO_MUTE) {
-                      setCrrSoundPerc(0);
-                      audioRef.current.volume = 0;
+              <div className="relative flex w-1/2 items-center">
+                <button
+                  className={cn("group p-2", scanning && "cursor-not-allowed")}
+                  onMouseEnter={() => setSoundHovered(true)}
+                  onMouseLeave={() => setSoundHovered(false)}
+                  disabled={scanning}
+                  onClick={() => {
+                    if (crrSoundPerc <= MIN_VOL_TO_MUTE) {
+                      // come back to prev vol if user manually droppes volume to mutable levels
+                      setCrrSoundPerc(initSoundVal);
+                      if (audioRef.current) {
+                        audioRef.current.volume = initSoundVal;
+                      }
                     } else {
-                      setCrrSoundPerc(value[0]);
-                      audioRef.current.volume = value[0];
+                      // save crr vol for next click to fall back to that value
+                      setInitSoundVal(crrSoundPerc);
+                      const newSoundVal = crrSoundPerc > 0 ? 0 : initSoundVal;
+                      setCrrSoundPerc(newSoundVal);
+                      if (audioRef.current) {
+                        console.log("newSoundVal", newSoundVal);
+                        audioRef.current.volume = newSoundVal;
+                      }
                     }
-                  }
-                }}
-                soundHovered={soundHovered}
-                ref={sliderRef}
-              />
+                  }}
+                >
+                  {(() => {
+                    let SoundIcon =
+                      crrSoundPerc <= MIN_VOL_TO_MUTE
+                        ? VolumeX
+                        : crrSoundPerc > MIN_VOL_TO_MUTE && crrSoundPerc < 0.75
+                        ? Volume1
+                        : crrSoundPerc >= 0.75
+                        ? Volume2
+                        : null;
+
+                    if (SoundIcon) {
+                      return (
+                        <SoundIcon
+                          className={cn(
+                            "h-4 w-4",
+                            !scanning &&
+                              "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
+                            scanning && "text-slate-400"
+                          )}
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
+                </button>
+                {/* volume slider */}
+                <Slider
+                  max={1}
+                  step={0.01}
+                  disabled={!trackReady}
+                  value={[crrSoundPerc]}
+                  onValueChange={(value) => {
+                    if (value[0] && audioRef.current) {
+                      // console.log("value[0]", value[0]);
+                      if (value[0] <= MIN_VOL_TO_MUTE) {
+                        setCrrSoundPerc(0);
+                        audioRef.current.volume = 0;
+                      } else {
+                        setCrrSoundPerc(value[0]);
+                        audioRef.current.volume = value[0];
+                      }
+                    }
+                  }}
+                  soundHovered={soundHovered}
+                  ref={sliderRef}
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </>
-  );
+      </>
+    );
+  }
 };
 
 const PlaybackControls = ({ className }: { className?: string }) => {

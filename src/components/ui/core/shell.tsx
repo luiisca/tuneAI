@@ -6,33 +6,48 @@ import {
   useEffect,
   useState,
 } from "react";
-// import useMeQuery from "server/trpc/hooks/useMeQuery";
 import Link from "next/link";
 import { noop } from "lodash";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/core/button";
 import { Icons } from "./icons";
-import { Compass, Library, LucideIcon, Megaphone } from "lucide-react";
+import {
+  Compass,
+  Library,
+  LogOut,
+  LucideIcon,
+  Megaphone,
+  MoreVertical,
+} from "lucide-react";
 import { cn } from "@/utils/cn";
+import { signOut, useSession } from "next-auth/react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../dropdown";
+import useMeQuery from "@/server/api/hooks/useMeQuery";
 
-// const useRedirectToLoginIfUnauthenticated = () => {
-//   const router = useRouter();
-//   const { data: session, status } = useSession();
-//   const loading = status === "loading";
-//
-//   useEffect(() => {
-//     if (!loading && !session) {
-//       router.replace({
-//         pathname: "/auth/login",
-//       });
-//     }
-//   }, [router, loading, session]);
-//
-//   return {
-//     loading: loading && !session,
-//     session,
-//   };
-// };
+const useRedirectToLoginIfUnauthenticated = () => {
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const loading = status === "loading";
+
+  useEffect(() => {
+    if (!loading && !session) {
+      router.replace({
+        pathname: "/login",
+      });
+    }
+  }, [router, loading, session]);
+
+  return {
+    loading: loading && !session,
+    session,
+  };
+};
+
 // const useRedirectToOnboardingIfNeeded = () => {
 //   const router = useRouter();
 //   const query = useMeQuery();
@@ -85,7 +100,7 @@ type LayoutProps = {
 };
 
 export default function Shell(props: LayoutProps) {
-  // useRedirectToLoginIfUnauthenticated();
+  useRedirectToLoginIfUnauthenticated();
   // useRedirectToOnboardingIfNeeded();
 
   return (
@@ -98,119 +113,81 @@ export default function Shell(props: LayoutProps) {
   );
 }
 
-// function UserDropdown({ small }: { small?: boolean }) {
-//   const query = useMeQuery();
-//   const user = query.data;
-//
-//   const [feedbackOpen, setFeedbackOpen] = useState(false);
-//   const [menuOpen, setMenuOpen] = useState(false);
-//   if (!user) {
-//     return null;
-//   }
-//   const onFeedbackItemSelect = () => {
-//     setFeedbackOpen(false);
-//     setMenuOpen(false);
-//   };
-//
-//   return (
-//     <Dropdown open={menuOpen} onOpenChange={() => setFeedbackOpen(false)}>
-//       <DropdownMenuTrigger asChild onClick={() => setMenuOpen(true)}>
-//         <button
-//           className={classNames(
-//             "group flex w-full cursor-pointer appearance-none items-center rounded-full p-2 text-left outline-none sm:ml-1 md:ml-0 md:rounded-md",
-//             "transition-all hover:bg-gray-100",
-//             "dark:bg-dark-secondary dark:shadow-darkBorder dark:hover:border-dark-500 dark:hover:bg-dark-tertiary",
-//             small &&
-//               "[&:not(:focus-visible)]:dark:hover:border-dark-500 [&:not(:focus-visible)]:dark:hover:bg-dark-tertiary [&:not(:focus-visible)]:dark:hover:shadow-darkBorder [&:not(:focus-visible)]:dark:border-transparent [&:not(:focus-visible)]:dark:bg-transparent [&:not(:focus-visible)]:dark:shadow-none"
-//           )}
-//         >
-//           {/*Avatar*/}
-//           <span
-//             className={classNames(
-//               small ? "h-8 w-8" : "mr-2 h-9 w-9",
-//               "relative flex-shrink-0 rounded-full bg-gray-300 "
-//             )}
-//           >
-//             {
-//               // eslint-disable-next-line @next/next/no-img-element
-//               <img
-//                 className="rounded-full"
-//                 src={user.avatar}
-//                 alt={user.username || "Nameless User"}
-//               />
-//             }
-//           </span>
-//           {/*Text*/}
-//           {!small && (
-//             <span className="flex flex-grow items-center truncate">
-//               <span className="flex-grow truncate text-sm">
-//                 <span className="dark:text-dark-neutral block truncate font-medium text-gray-900">
-//                   {user.name || "Nameless User"}
-//                 </span>
-//                 <span className="dark:text-dark-600 block truncate font-normal text-neutral-500">
-//                   {user.username || undefined}
-//                 </span>
-//               </span>
-//               <FiMoreVertical
-//                 className="h-4 w-4 flex-shrink-0 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-400"
-//                 aria-hidden="true"
-//               />
-//             </span>
-//           )}
-//         </button>
-//       </DropdownMenuTrigger>
-//       <DropdownMenuPortal>
-//         <DropdownMenuContent onInteractOutside={() => setMenuOpen(false)}>
-//           {feedbackOpen ? (
-//             <FeedbackMenuItem
-//               onFeedbackItemSelect={() => onFeedbackItemSelect()}
-//             />
-//           ) : (
-//             <>
-//               {/* <DropdownMenuItem> */}
-//               {/*   <button */}
-//               {/*     className={classNames( */}
-//               {/*       "flex w-full items-center px-4 py-2 text-sm" */}
-//               {/*     )} */}
-//               {/*     onClick={() => setFeedbackOpen(true)} */}
-//               {/*   > */}
-//               {/*     <FiHeart */}
-//               {/*       className={classNames( */}
-//               {/*         "mr-2 h-4 w-4 flex-shrink-0", */}
-//               {/*         "text-gray-500 group-hover:text-neutral-500", */}
-//               {/*         "dark:text-dark-600 dark:group-hover:text-dark-neutral" */}
-//               {/*       )} */}
-//               {/*       aria-hidden="true" */}
-//               {/*     /> */}
-//               {/*     Feedback */}
-//               {/*   </button> */}
-//               {/* </DropdownMenuItem> */}
-//               {/**/}
-//               {/* <DropdownMenuSeparator /> */}
-//
-//               <DropdownMenuItem>
-//                 <a
-//                   onClick={() => signOut({ callbackUrl: "/auth/logout" })}
-//                   className="group flex cursor-pointer items-center px-4 py-2"
-//                 >
-//                   <FiLogOut
-//                     className={classNames(
-//                       "mr-2 h-4 w-4 flex-shrink-0",
-//                       "text-gray-500 group-hover:text-neutral-500",
-//                       "dark:text-dark-600 dark:group-hover:text-dark-neutral"
-//                     )}
-//                     aria-hidden="true"
-//                   />
-//                   Sign out
-//                 </a>
-//               </DropdownMenuItem>
-//             </>
-//           )}
-//         </DropdownMenuContent>
-//       </DropdownMenuPortal>
-//     </Dropdown>
-//   );
-// }
+function UserDropdown({ small }: { small?: boolean }) {
+  const query = useMeQuery();
+  const user = query.data;
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="-translate-y-24">
+      <DropdownMenu open={menuOpen}>
+        <DropdownMenuTrigger asChild onClick={() => setMenuOpen(true)}>
+          <button
+            className={cn(
+              "group flex w-full cursor-pointer appearance-none items-center rounded-full p-2 text-left outline-none transition-all sm:ml-1 md:ml-0 md:rounded-md",
+              "hover:bg-slate-100 dark:hover:bg-slate-800",
+              small &&
+                "[&:not(:focus-visible)]:dark:hover:border-dark-500 [&:not(:focus-visible)]:dark:hover:bg-dark-tertiary [&:not(:focus-visible)]:dark:hover:shadow-darkBorder [&:not(:focus-visible)]:dark:border-transparent [&:not(:focus-visible)]:dark:bg-transparent [&:not(:focus-visible)]:dark:shadow-none"
+            )}
+          >
+            {/*Avatar*/}
+            <span
+              className={cn(
+                small ? "h-8 w-8" : "mr-2 h-9 w-9",
+                "relative flex-shrink-0 animate-pulse rounded-full bg-slate-500"
+              )}
+            >
+              {
+                // eslint-disable-next-line @next/next/no-img-element
+                <div
+                  className="h-full w-full rounded-full"
+                  // src={user.avatar}
+                  // alt={user.username || "Nameless User"}
+                />
+              }
+            </span>
+            {/*Text*/}
+            {!small && (
+              <span className="flex flex-grow items-center truncate">
+                <span className="flex-grow truncate text-sm">
+                  <span className="block truncate font-medium">
+                    {user.name || "Nameless User"}
+                  </span>
+                  <span className="block truncate font-normal text-slate-700 dark:text-slate-400 ">
+                    {user.email || undefined}
+                  </span>
+                </span>
+                <MoreVertical
+                  className="h-4 w-4 flex-shrink-0 text-slate-400 group-hover:text-slate-500 dark:group-hover:text-slate-400"
+                  aria-hidden="true"
+                />
+              </span>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          onInteractOutside={() => setMenuOpen(false)}
+          className="rounded-lg"
+        >
+          <DropdownMenuItem
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="disable-focus-visible group flex cursor-pointer items-center rounded-md px-4 py-2"
+          >
+            <LogOut
+              className={cn("mr-2 h-4 w-4 flex-shrink-0")}
+              aria-hidden="true"
+            />
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
 
 const navigation: NavigationItemType[] = [
   {
@@ -364,11 +341,11 @@ function SideBar() {
       <div className="mb-2 flex flex-col items-center">
         <ThemeToggle className="mb-2 lg:hidden" />
         <span className="hidden w-full lg:inline">
-          {/* <UserDropdown /> */}
-          <span>User</span>
+          <UserDropdown />
+          {/* <span>User</span> */}
         </span>
         <span className="hidden md:inline lg:hidden">
-          {/* <UserDropdown small /> */}
+          <UserDropdown small />
         </span>
       </div>
     </aside>
