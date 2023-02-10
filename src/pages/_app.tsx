@@ -241,12 +241,11 @@ const MusicPlayer = () => {
   const [playerOpen, setPlayerOpen] = useState(true);
   const [soundHovered, setSoundHovered] = useState(true);
 
-  const [crrSoundPerc, setCrrSoundVal] = useState<number>(DEFAULT_SOUND);
+  const [crrSoundPerc, setCrrSoundPerc] = useState<number>(DEFAULT_SOUND);
   const [initSoundVal, setInitSoundVal] = useState<number>(crrSoundPerc);
 
   const [crrSongPerc, setCrrSongPerc] = useState(0);
   const [duration, setDuration] = useState<number | null>(null);
-  const [volume, setVolume] = useState<number | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
@@ -302,23 +301,23 @@ const MusicPlayer = () => {
             }
           }}
         >
-          Update song
+          Load song
         </Button>
       </div>
       <audio
         ref={audioRef}
         loop={loop}
-        controls
         onLoadStart={(e) => {
-          console.log("ON LOAD START", e);
+          // console.log("ON LOAD START", e);
           dispatch({ type: "SET_TRACK_READY", ready: false });
         }}
         onLoadedData={(e) => {
-          console.log("ON LOADED DATA", e);
+          // console.log("ON LOADED DATA", e);
           setDuration(e.target.duration);
+          setCrrSoundPerc(e.target.volume);
         }}
         onCanPlay={(e) => {
-          console.log("ON CANPLAY", e);
+          // console.log("ON CANPLAY", e);
           dispatch({ type: "SET_TRACK_READY", ready: true });
           if (audioRef.current) {
             audioRef.current.play();
@@ -326,20 +325,20 @@ const MusicPlayer = () => {
           dispatch({ type: "TOGGLE_PLAY", playing: true });
         }}
         onTimeUpdate={(e) => {
-          console.log("ON TIME UPDATE", e);
-          console.log("duration", duration);
+          // console.log("ON TIME UPDATE", e);
+          // console.log("duration", duration);
           const percentage = e.target.currentTime / duration;
 
-          console.log("percentage", percentage);
+          // console.log("percentage", percentage);
           setCrrSongPerc(percentage);
           // updateSliderPosition(Math.floor(percentage));
         }}
         onWaiting={(e) => {
-          console.log("ON WAITING", e);
+          // console.log("ON WAITING", e);
           dispatch({ type: "SET_TRACK_READY", ready: false });
         }}
         onEnded={(e) => {
-          console.log("ON ENDED", e);
+          // console.log("ON ENDED", e);
           dispatch({ type: "TOGGLE_PLAY", playing: false });
           // go to next song
         }}
@@ -577,6 +576,9 @@ const MusicPlayer = () => {
             <button
               className={cn("group p-2", scanning && "cursor-not-allowed")}
               disabled={scanning}
+              onClick={() => {
+                showToast("Coming Soon!", "warning");
+              }}
             >
               <MonitorSpeaker
                 className={cn(
@@ -595,13 +597,20 @@ const MusicPlayer = () => {
                 disabled={scanning}
                 onClick={() => {
                   if (crrSoundPerc <= MIN_VOL_TO_MUTE) {
-                    setCrrSoundVal(initSoundVal);
-                    updateSliderPosition(initSoundVal);
+                    // come back to prev vol if user manually droppes volume to mutable levels
+                    setCrrSoundPerc(initSoundVal);
+                    if (audioRef.current) {
+                      audioRef.current.volume = initSoundVal;
+                    }
                   } else {
+                    // save crr vol for next click to fall back to that value
                     setInitSoundVal(crrSoundPerc);
                     const newSoundVal = crrSoundPerc > 0 ? 0 : initSoundVal;
-                    setCrrSoundVal(newSoundVal);
-                    updateSliderPosition(newSoundVal);
+                    setCrrSoundPerc(newSoundVal);
+                    if (audioRef.current) {
+                      console.log("newSoundVal", newSoundVal);
+                      audioRef.current.volume = newSoundVal;
+                    }
                   }
                 }}
               >
@@ -634,15 +643,16 @@ const MusicPlayer = () => {
               <Slider
                 max={1}
                 step={0.01}
+                disabled={!trackReady}
                 value={[crrSoundPerc]}
                 onValueChange={(value) => {
                   if (value[0] && audioRef.current) {
-                    console.log("value[0]", value[0]);
+                    // console.log("value[0]", value[0]);
                     if (value[0] <= MIN_VOL_TO_MUTE) {
-                      setCrrSoundVal(0);
+                      setCrrSoundPerc(0);
                       audioRef.current.volume = 0;
                     } else {
-                      setCrrSoundVal(value[0]);
+                      setCrrSoundPerc(value[0]);
                       audioRef.current.volume = value[0];
                     }
                   }
