@@ -22,7 +22,15 @@ import { getServerAuthSession } from "../auth";
 import { prisma } from "../db";
 
 type CreateContextOptions = {
-  session: Session | null;
+  session:
+    | (Session & {
+        user: {
+          id: string;
+        };
+        profileSrc: string;
+        avatar: string | undefined;
+      })
+    | null;
 };
 
 /**
@@ -52,7 +60,13 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   const { req, res } = opts;
 
   // Get the session from the server using the getServerSession wrapper function
-  const session = await getServerAuthSession({ req, res });
+  const session = (await getServerAuthSession({ req, res })) as Session & {
+    user: {
+      id: string;
+    };
+    profileSrc: string;
+    avatar: string | undefined;
+  };
 
   return createInnerTRPCContext({
     session,

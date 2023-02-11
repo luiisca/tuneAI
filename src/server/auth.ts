@@ -1,11 +1,18 @@
 import type { GetServerSidePropsContext } from "next";
-import { getServerSession } from "next-auth";
+import {
+  Account,
+  Awaitable,
+  CallbacksOptions,
+  getServerSession,
+  Profile,
+} from "next-auth";
 import type { NextAuthOptions, DefaultSession } from "next-auth";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { env } from "../env/server.mjs";
 import { prisma } from "./db";
 import SpotifyProvider from "next-auth/providers/spotify";
 import { WEBAPP_URL } from "@/utils/constants";
+import { JWT } from "next-auth/jwt/types.js";
 
 /**
  * Module augmentation for `next-auth` types.
@@ -36,30 +43,49 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  **/
 export const authOptions: NextAuthOptions = {
+  session: {
+    strategy: "jwt",
+  },
+  pages: {
+    signIn: "/login",
+  },
   callbacks: {
-    jwt(props) {
-      console.log("JWT", props);
-      return props;
-    },
-    session({ session, user, token }) {
-      console.log("SESION", session);
-      console.log("USER", user);
-      console.log("TOKEN", token);
-      if (session.user) {
-        session.user.id = user.id;
-        // session.user.role = user.role; <-- put other properties on the session here
+    async jwt({ token, user, account, profile }) {
+      if (user) {
+        token.id = user.id;
       }
-      return session;
+      if (account) {
+        token.accessToken = account.refresh_token;
+      }
+      if (profile) {
+        const typedProfile = profile as Profile & {
+          external_urls: {
+            spotify: string;
+          };
+          images: { url: string }[];
+        };
+        token.profileSrc = typedProfile.external_urls.spotify;
+        token.avatar = typedProfile.images[0]?.url;
+      }
+      return token;
     },
-    async redirect({ url, baseUrl }) {
-      console.log("REDIRECT CALLBACK");
-      console.log("REDIRECT URL + BASEURL", url, baseUrl);
-      // Allows relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      // Allows callback URLs on the same domain
-      else if (new URL(url).hostname === new URL(WEBAPP_URL as string).hostname)
-        return url;
-      return baseUrl;
+    async session({ session, token, user }) {
+      console.log(
+        "SESION PROPS",
+        "session",
+        session,
+        "token",
+        token,
+        "user",
+        user
+      );
+      if (session && token) {
+        session.user.id = token.id as string;
+      }
+      return {
+        ...session,
+        ...token,
+      };
     },
   },
   adapter: PrismaAdapter(prisma),

@@ -138,15 +138,15 @@ function UserDropdown({ small }: { small?: boolean }) {
             <span
               className={cn(
                 small ? "h-8 w-8" : "mr-2 h-9 w-9",
-                "relative flex-shrink-0 animate-pulse rounded-full bg-slate-500"
+                "relative flex-shrink-0 rounded-full"
               )}
             >
               {
                 // eslint-disable-next-line @next/next/no-img-element
-                <div
+                <img
                   className="h-full w-full rounded-full"
-                  // src={user.avatar}
-                  // alt={user.username || "Nameless User"}
+                  src={user.avatar}
+                  alt={user.name || "Nameless User"}
                 />
               }
             </span>
@@ -154,9 +154,13 @@ function UserDropdown({ small }: { small?: boolean }) {
             {!small && (
               <span className="flex flex-grow items-center truncate">
                 <span className="flex-grow truncate text-sm">
-                  <span className="block truncate font-medium">
+                  <a
+                    href={user.profileSrc}
+                    target="_blank"
+                    className="block w-fit truncate font-medium hover:underline hover:underline-offset-2"
+                  >
                     {user.name || "Nameless User"}
-                  </span>
+                  </a>
                   <span className="block truncate font-normal text-slate-700 dark:text-slate-400 ">
                     {user.email || undefined}
                   </span>
