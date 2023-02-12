@@ -27,6 +27,10 @@ module.exports = {
         accent: "#1db954",
         accentBright: "#1ed760",
       },
+      boxShadow: {
+        cover:
+          "drop-shadow(0 0 1px rgba(0,0,0,.3)) drop-shadow(0 0 10px rgba(0,0,0,.3))",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

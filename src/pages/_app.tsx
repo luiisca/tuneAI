@@ -4,6 +4,7 @@ import { type Session } from "next-auth";
 import { Inter as FontSans } from "@next/font/google";
 import { SessionProvider } from "next-auth/react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
+import Image from "next/image";
 
 import { api } from "../utils/api";
 
@@ -52,7 +53,6 @@ import { Button } from "@/components/ui/core/button";
 import { DEFAULT_SOUND, MIN_VOL_TO_MUTE } from "@/utils/constants";
 import { Progress } from "@/components/ui/progress";
 import { convertToSeconds, formatSongDuration } from "@/utils/song-time";
-import { getServerAuthSession } from "@/server/auth";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -63,15 +63,21 @@ const fontSans = FontSans({
 const FavouriteBttn = ({
   className,
   iconClassName,
+  songId,
   ...props
 }: React.ComponentProps<typeof Button> & {
   className?: string;
   iconClassName?: string;
+  songId: string;
 }) => {
   const {
-    state: { favourite, scanning },
+    state: { songsList, scanning },
     dispatch,
   } = useContext(MusicPlayerContext);
+  const { current: favourite } = useRef(
+    songsList &&
+      songsList[songsList.findIndex((song) => song.id === songId)]?.favourite
+  );
 
   return (
     <button
@@ -82,11 +88,14 @@ const FavouriteBttn = ({
         className ? className : ""
       )}
       onClick={() => {
-        !favourite && showToast("Coming Soon!", "warning");
-        dispatch({ type: "TOGGLE_FAVOURITE" });
-        setTimeout(() => {
-          dispatch({ type: "TOGGLE_FAVOURITE" });
-        }, 1000);
+        if (songsList) {
+          const songPos = songsList.findIndex((song) => song.id === songId);
+          !favourite && showToast("Coming Soon!", "warning");
+          dispatch({ type: "TOGGLE_FAVOURITE", songPos });
+          setTimeout(() => {
+            dispatch({ type: "TOGGLE_FAVOURITE", songPos });
+          }, 1000);
+        }
       }}
       disabled={scanning}
     >
@@ -98,7 +107,7 @@ const FavouriteBttn = ({
             "group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
           scanning && "text-slate-400",
           favourite && "fill-accent text-accent dark:text-accent",
-          iconClassName ? iconClassName : ""
+          iconClassName
         )}
       />
     </button>
@@ -134,12 +143,17 @@ const createCtx = <StateType, ActionType>(
 
 type ActionType =
   | {
+      type: "SAVE_SONGS";
+      songs: PlayerSong[];
+    }
+  | {
       type: "TOGGLE_PLAY";
       playing?: boolean;
       // payload: src, ai analysis
     }
   | {
       type: "TOGGLE_FAVOURITE";
+      songPos: number;
     }
   | {
       type: "SET_SCANNING";
@@ -158,35 +172,61 @@ type ActionType =
     }
   | {
       type: "SELECT_SONG";
-      src: string;
+      songId: string;
     };
 
-type InitStateType = {
-  index: number | null; // playing song id for play icon on songs list
-  playing: boolean;
+type PlayerSong = {
+  id: string;
+  title: string;
+  artists: string[];
+  coverUrl: string;
   favourite: boolean;
+  audioSrc: string;
+};
+type InitStateType = {
+  audioRef: React.MutableRefObject<HTMLAudioElement | null>;
+  songsList: PlayerSong[] | null;
+  playing: boolean;
+  crrPlayingId: string | null;
+  crrPlayingSong: PlayerSong | null;
   scanning: boolean;
   loop: boolean;
   trackReady: boolean | null;
-  audioRef: React.MutableRefObject<HTMLAudioElement | null>;
-  audioSrc: string | null;
 };
 
 const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
   switch (action.type) {
+    case "SAVE_SONGS": {
+      return {
+        ...state,
+        songsList: action.songs,
+      };
+    }
     case "TOGGLE_PLAY": {
       return {
         ...state,
         playing: action.playing ?? !state.playing,
-        // set new src,
-        // set ai analysis, etc
       };
     }
     case "TOGGLE_FAVOURITE": {
-      return {
-        ...state,
-        favourite: !state.favourite,
-      };
+      if (
+        state.songsList &&
+        state.crrPlayingId &&
+        state.songsList[action.songPos] !== undefined
+      ) {
+        return {
+          ...state,
+          songsList: [
+            ...state.songsList,
+            {
+              ...state.songsList[action.songPos],
+              favourite: !state.songsList[action.songPos]?.favourite,
+            },
+          ],
+        } as InitStateType;
+      }
+
+      return state;
     }
     case "SET_SCANNING": {
       return {
@@ -213,12 +253,29 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
       };
     }
     case "SELECT_SONG": {
-      if (state.audioRef && state.audioRef.current && action.src) {
-        state.audioRef.current.src = action.src;
+      const songPos =
+        state.songsList &&
+        state.songsList.findIndex((song) => song.id === action.songId);
+
+      // set audioRef src
+      if (
+        state.audioRef &&
+        state.audioRef.current &&
+        (songPos === 0 || songPos) &&
+        state.songsList
+      ) {
+        state.audioRef.current.src = state.songsList[songPos]?.audioSrc || "";
       }
+
       return {
         ...state,
-        audioSrc: action.src,
+        crrPlayingId: action.songId,
+        crrPlayingSong:
+          (state.songsList &&
+            state.songsList[
+              state.songsList.findIndex((song) => song.id === action.songId)
+            ]) ||
+          null,
       };
     }
 
@@ -230,13 +287,14 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
 
 const musicPlayerInitState: InitStateType = {
   playing: false,
-  favourite: false,
-  index: null,
+  crrPlayingId: null,
+  crrPlayingSong: null,
   scanning: false,
   loop: false,
+
+  songsList: null,
   trackReady: null,
   audioRef: { current: null },
-  audioSrc: null,
 };
 
 const [ctx, MusicPlayerProvider] = createCtx(
@@ -254,14 +312,22 @@ const MusicPlayer = () => {
   const { status } = useSession();
 
   const {
-    state: { scanning, loop, trackReady },
+    state: {
+      crrPlayingSong,
+      songsList,
+      crrPlayingId,
+      scanning,
+      loop,
+      trackReady,
+    },
     dispatch,
   } = useContext(MusicPlayerContext);
-  const [playerOpen, setPlayerOpen] = useState(true);
+
+  const [playerOpen, setPlayerOpen] = useState(false);
   const [soundHovered, setSoundHovered] = useState(true);
 
   const [crrSoundPerc, setCrrSoundPerc] = useState<number>(DEFAULT_SOUND);
-  const [initSoundVal, setInitSoundVal] = useState<number>(crrSoundPerc);
+  const [initSoundVal, setInitSoundVal] = useState<number>(DEFAULT_SOUND);
 
   const [crrSongPerc, setCrrSongPerc] = useState(0);
   const [duration, setDuration] = useState<number | null>(null);
@@ -370,187 +436,225 @@ const MusicPlayer = () => {
           className={cn("fixed right-0 bottom-[88px] z-40 w-full md:bottom-0")}
         >
           {/* mobile floating playing bar */}
-          <div
-            className={cn(
-              "relative mx-2 flex cursor-pointer flex-col justify-center rounded-lg border border-gray-100 bg-gray-50 p-2 backdrop-blur-0 dark:border-transparent dark:bg-slate-700 md:hidden"
-            )}
-            onClick={(e) => {
-              if (!e.target.closest("button")) {
-                setPlayerOpen(true);
-              }
-            }}
-          >
-            <div className="flex items-center space-x-2">
-              {/* track cover */}
-              <div className="mr-1 ">
-                <div className="h-10 w-10 animate-pulse rounded-md bg-slate-900"></div>
+          {crrPlayingSong && (
+            <div
+              className={cn(
+                "relative mx-2 flex cursor-pointer flex-col justify-center rounded-lg border border-gray-100 bg-gray-50 p-2 backdrop-blur-0 dark:border-transparent dark:bg-slate-700 md:hidden"
+              )}
+              onClick={(e) => {
+                if (!e.target.closest("button")) {
+                  setPlayerOpen(true);
+                }
+              }}
+            >
+              <div className="flex items-center space-x-2">
+                {/* track cover */}
+                <div className="relative mr-1 h-10 w-10 shrink-0">
+                  <Image
+                    alt={`${crrPlayingSong.title} playing`}
+                    fill
+                    className="rounded-md object-cover"
+                    src={crrPlayingSong.coverUrl || "/defaultSongCover.jpeg"}
+                  />
+                </div>
+                {/* Text */}
+                <div className="dark:slate-50 w-full text-sm">
+                  <p className="font-bold">{crrPlayingSong.title}</p>
+                  <p className="font-normal">{crrPlayingSong.artists[0]}</p>
+                </div>
+                {/* controls */}
+                <div className="absolute right-0 z-50 flex h-full">
+                  {crrPlayingId && <FavouriteBttn songId={crrPlayingId} />}
+                  <PlayBttn
+                    className={cn(
+                      "relative p-2",
+                      (scanning || trackReady === false) && "cursor-not-allowed"
+                    )}
+                    LoadingIcon={() => (
+                      <LoadingIcon
+                        className="top-2.5 left-0"
+                        svgClassName="w-9 h-9"
+                      />
+                    )}
+                    iconClassName="translate-x-0 fill-slate-900 dark:fill-white"
+                  />
+                </div>
               </div>
-              {/* Text */}
-              <div className="dark:slate-50 w-full text-sm">
-                <p className="font-bold">Song's name</p>
-                <p className="font-normal">Artist name</p>
-              </div>
-              {/* controls */}
-              <div className="absolute right-0 z-50 flex h-full">
-                <FavouriteBttn />
-                <PlayBttn
-                  className={cn(
-                    "relative p-2",
-                    (scanning || trackReady === false) && "cursor-not-allowed"
-                  )}
-                  LoadingIcon={() => (
-                    <LoadingIcon
-                      className="top-2.5 left-0"
-                      svgClassName="w-9 h-9"
-                    />
-                  )}
-                  iconClassName="translate-x-0 fill-slate-900 dark:fill-white"
-                />
-              </div>
+              <Progress
+                value={crrSongPerc * 100}
+                className="absolute inset-x-2 bottom-0 h-0.5 w-auto"
+              />
             </div>
-            <Progress
-              value={crrSongPerc * 100}
-              className="absolute inset-x-2 bottom-0 h-0.5 w-auto"
-            />
-          </div>
+          )}
 
           {/* mobile overlay player */}
-          <aside
-            className={cn(
-              "fixed inset-0 flex h-screen w-screen transform flex-col transition duration-200 ease-in-out md:hidden",
-              "bg-gradient-to-b from-gray-50 to-gray-100 p-3",
-              "dark:from-slate-800 dark:to-slate-900",
-              playerOpen ? "translate-y-0" : "translate-y-full"
-            )}
-          >
-            {/* close and more */}
-            <div className="mb-10 flex w-full items-center">
-              <button className="p-2" onClick={() => setPlayerOpen(false)}>
-                <ChevronDown className="h-8 w-8" />
-              </button>
+          {playerOpen && crrPlayingSong && (
+            <aside
+              className={cn(
+                "fixed inset-0 flex h-screen w-screen transform flex-col transition duration-200 ease-in-out md:hidden",
+                "bg-gradient-to-b from-gray-50 to-gray-100 p-3",
+                "dark:from-slate-800 dark:to-slate-900",
+                playerOpen ? "translate-y-0" : "translate-y-full"
+              )}
+            >
+              {/* close and more */}
+              <div className="mb-10 flex w-full items-center">
+                <button className="p-2" onClick={() => setPlayerOpen(false)}>
+                  <ChevronDown className="h-8 w-8" />
+                </button>
 
-              <p className="dark:slate-50 w-full text-center text-sm font-bold">
-                Similar songs
-              </p>
-              {/* {similars && <p>Similar songs</p>} */}
+                <p className="dark:slate-50 w-full text-center text-sm font-bold">
+                  Similar songs
+                </p>
+                {/* {similars && <p>Similar songs</p>} */}
 
-              <DropdownMenu>
-                <DropdownMenuTrigger className="p-3">
-                  <MoreHorizontal className="h-6 w-6" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="mr-3">
-                  <DropdownMenuItem
-                    className="flex items-center space-x-3"
-                    onClick={() => showToast("Coming Soon!", "warning")}
-                  >
-                    <ListPlus />
-                    <span className="font-bold">Add to Playlist</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center space-x-3">
-                    <Disc />
-                    <span className="font-bold">View Album</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            {/* track cover */}
-            <div className="mb-6 h-full p-0">
-              <div className="h-full w-full animate-pulse rounded-2xl bg-slate-900" />
-            </div>
-            {/* title and favourite */}
-            <div className="mx-3 mb-4 flex items-center">
-              <div className="w-full">
-                {scanning ? (
-                  <div className="flex flex-col space-y-1">
-                    <SkeletonText className="w-1/2 text-xl" />
-                    <SkeletonText className="w-1/3" />
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-2xl font-bold">Song's name</p>
-                    <p className="font-normal">Artist name</p>
-                  </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="p-3">
+                    <MoreHorizontal className="h-6 w-6" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="mr-3">
+                    <DropdownMenuItem
+                      className="flex items-center space-x-3"
+                      onClick={() => showToast("Coming Soon!", "warning")}
+                    >
+                      <ListPlus />
+                      <span className="font-bold">Add to Playlist</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="flex items-center space-x-3">
+                      <Disc />
+                      <span className="font-bold">View Album</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              {/* track cover */}
+              <div>
+                <div />
+              </div>
+              <div className="relative mb-6 h-full p-0">
+                <Image
+                  alt={`${crrPlayingSong.title} playing`}
+                  fill
+                  className="h-full w-full rounded-2xl object-contain shadow-cover"
+                  src={crrPlayingSong.coverUrl || "/defaultSongCover.jpeg"}
+                />
+              </div>
+              {/* title and favourite */}
+              <div className="mx-3 mb-4 flex items-center">
+                <div className="w-full">
+                  {scanning ? (
+                    <div className="flex flex-col space-y-1">
+                      <SkeletonText className="w-1/2 text-xl" />
+                      <SkeletonText className="w-1/3" />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold">
+                        {crrPlayingSong.title}
+                      </p>
+                      <p className="font-normal">Artist name</p>
+                    </>
+                  )}
+                </div>
+                {crrPlayingId && (
+                  <FavouriteBttn className="p-3 pr-0" songId={crrPlayingId} />
                 )}
               </div>
-              <FavouriteBttn className="p-3 pr-0" />
-            </div>
 
-            {/* mobile progress bar */}
-            <div className="mx-3 mb-5">
-              <Slider
-                max={1}
-                step={0.01}
-                value={[crrSongPerc]}
-                className="pt-5 pb-2"
-                onValueChange={(value) => {
-                  if (audioRef.current && value[0] && duration) {
-                    // translate value to seconds
-                    audioRef.current.currentTime = convertToSeconds(
-                      duration,
-                      value[0]
-                    );
-                  }
-                }}
-              />
-              <div className="flex justify-between text-[0.6875rem] dark:text-slate-50">
-                {scanning ? (
-                  <>
-                    <SkeletonText className="w-8" />
-                    <SkeletonText className="w-8" />
-                  </>
-                ) : (
-                  <>
-                    <span className="block h-4">
-                      {duration &&
-                        formatSongDuration(
-                          convertToSeconds(duration, crrSongPerc)
-                        )}
-                    </span>
-                    <span>{duration && formatSongDuration(duration)}</span>
-                  </>
-                )}
+              {/* mobile progress bar */}
+              <div className="mx-3 mb-5">
+                <Slider
+                  max={1}
+                  step={0.01}
+                  value={[crrSongPerc]}
+                  className="pt-5 pb-2"
+                  onValueChange={(value) => {
+                    if (audioRef.current && value[0] && duration) {
+                      // translate value to seconds
+                      audioRef.current.currentTime = convertToSeconds(
+                        duration,
+                        value[0]
+                      );
+                    }
+                  }}
+                />
+                <div className="flex justify-between text-[0.6875rem] dark:text-slate-50">
+                  {scanning ? (
+                    <>
+                      <SkeletonText className="w-8" />
+                      <SkeletonText className="w-8" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="block h-4">
+                        {duration &&
+                          formatSongDuration(
+                            convertToSeconds(duration, crrSongPerc)
+                          )}
+                      </span>
+                      <span>{duration && formatSongDuration(duration)}</span>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-            {/* controls */}
-            <PlaybackControls />
-            {/* play in device and share buttons */}
-            <div className="flex justify-between">
-              <div
-                className={cn(
-                  "p-2",
+              {/* controls */}
+              <PlaybackControls />
+              {/* play in device and share buttons */}
+              <div className="flex justify-between">
+                <div
+                  className={cn(
+                    "p-2",
 
-                  scanning && "fill-slate-400 text-slate-400"
-                )}
-              >
-                <MonitorSpeaker className="h-4 w-4" />
+                    scanning && "fill-slate-400 text-slate-400"
+                  )}
+                >
+                  <MonitorSpeaker className="h-4 w-4" />
+                </div>
+                <div
+                  className={cn(
+                    "p-2",
+                    scanning && "fill-slate-400 text-slate-400"
+                  )}
+                >
+                  <Share2 className="h-4 w-4" />
+                </div>
               </div>
-              <div
-                className={cn(
-                  "p-2",
-                  scanning && "fill-slate-400 text-slate-400"
-                )}
-              >
-                <Share2 className="h-4 w-4" />
-              </div>
-            </div>
-          </aside>
+            </aside>
+          )}
 
           {/* DESKTOP PLAYER */}
           <div className="hidden h-24 border-t border-t-gray-100 bg-gray-50 p-4 dark:border-t-slate-700 dark:bg-slate-900 md:flex">
             <div className="flex w-full items-center justify-start">
               {/* track cover */}
-              <div className="h-14 w-14 flex-shrink-0 animate-pulse rounded-md bg-slate-500"></div>
+              {crrPlayingSong && (
+                <div className="relative h-14 w-14 shrink-0">
+                  <Image
+                    src={crrPlayingSong.coverUrl || "/defaultSongCover.jpeg"}
+                    alt={`${crrPlayingSong.title} playing`}
+                    fill
+                    className="flex-shrink-0 rounded-md object-cover"
+                  />
+                </div>
+              )}
 
               {/* Text */}
-              <div className="dark:slate-50 mx-3.5 text-sm ">
-                <p>Song's name</p>
-                <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">
-                  Artist name
-                </p>
-              </div>
+              {crrPlayingSong && (
+                <div className="dark:slate-50 mx-3.5 text-sm ">
+                  <p>{crrPlayingSong.title}</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">
+                    {crrPlayingSong.artists[0]}
+                  </p>
+                </div>
+              )}
 
               {/* favourite */}
-              <FavouriteBttn className="group" iconClassName="h-4 w-4" />
+              {crrPlayingId && (
+                <FavouriteBttn
+                  className="group"
+                  iconClassName="h-4 w-4"
+                  songId={crrPlayingId}
+                />
+              )}
             </div>
             <div className="w-full ">
               <PlaybackControls className="mb-2" />
@@ -692,6 +796,8 @@ const MusicPlayer = () => {
       </>
     );
   }
+
+  return null;
 };
 
 const PlaybackControls = ({ className }: { className?: string }) => {

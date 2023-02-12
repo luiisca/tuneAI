@@ -60,6 +60,7 @@ interface SearchSongsResult {
 export type SongType = {
   id: string;
   title: string;
+  artists: string[];
   previewUrl: string | null;
   coverUrl: string;
   genres: string[];
@@ -84,7 +85,6 @@ const getAiRecomSongs = async (text: string) => {
     },
   });
   const songs = (await res.json()) as SearchSongsResult;
-  console.log("CIANYTE SONGS", songs);
   return songs.data.freeTextSearch.edges;
 };
 
@@ -105,7 +105,6 @@ const getAccessToken = async (refreshToken: string): Promise<string | null> => {
     },
   });
   const data = await res.json();
-  console.log("ACCESS TOKEN DATA", data);
   return data.access_token;
 };
 const getSpotifyTrackData = async (trackId: string, refreshToken: string) => {
@@ -116,13 +115,14 @@ const getSpotifyTrackData = async (trackId: string, refreshToken: string) => {
     },
   });
   const data = (await res.json()) as SpotifyApi.TrackObjectFull;
-  console.log("SPOTIFY DATA", data);
   return {
     coverUrl:
       data?.album?.images[0]?.url ||
       data?.album?.images[1]?.url ||
       "/defaultSongCover.jpeg",
     previewUrl: data?.preview_url,
+    title: data.name,
+    artists: data.artists.map((artist) => artist.name),
   };
 };
 
@@ -148,7 +148,6 @@ export const searchAiRouter = createTRPCRouter({
           return {
             ...spotifyTrack,
             id: recomSong.cursor,
-            title: recomSong.node.title,
             genres: recomSong.node.audioAnalysisV6.result.genreTags,
             moods: recomSong.node.audioAnalysisV6.result.moodTags,
             instruments: recomSong.node.audioAnalysisV6.result.instrumentTags,
