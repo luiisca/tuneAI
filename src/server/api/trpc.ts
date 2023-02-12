@@ -15,22 +15,23 @@
  * These allow you to access things when processing a request, like the
  * database, the session, etc.
  */
-import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
-import { type Session } from "next-auth";
+import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
+import type { Session } from "next-auth";
 
 import { getServerAuthSession } from "../auth";
 import { prisma } from "../db";
 
+type SessionType = Session & {
+  user: {
+    id: string;
+  };
+  profileSrc: string;
+  avatar: string | undefined;
+  accessToken: string;
+};
+
 type CreateContextOptions = {
-  session:
-    | (Session & {
-        user: {
-          id: string;
-        };
-        profileSrc: string;
-        avatar: string | undefined;
-      })
-    | null;
+  session: SessionType | null;
 };
 
 /**
@@ -60,13 +61,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   const { req, res } = opts;
 
   // Get the session from the server using the getServerSession wrapper function
-  const session = (await getServerAuthSession({ req, res })) as Session & {
-    user: {
-      id: string;
-    };
-    profileSrc: string;
-    avatar: string | undefined;
-  };
+  const session = (await getServerAuthSession({ req, res })) as SessionType;
 
   return createInnerTRPCContext({
     session,

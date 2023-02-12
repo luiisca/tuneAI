@@ -155,6 +155,10 @@ type ActionType =
   | {
       type: "SAVE_AUDIO_REF";
       audioRef: React.MutableRefObject<HTMLAudioElement | null>;
+    }
+  | {
+      type: "SELECT_SONG";
+      src: string;
     };
 
 type InitStateType = {
@@ -165,6 +169,7 @@ type InitStateType = {
   loop: boolean;
   trackReady: boolean | null;
   audioRef: React.MutableRefObject<HTMLAudioElement | null>;
+  audioSrc: string | null;
 };
 
 const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
@@ -207,6 +212,15 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         audioRef: action.audioRef,
       };
     }
+    case "SELECT_SONG": {
+      if (state.audioRef && state.audioRef.current && action.src) {
+        state.audioRef.current.src = action.src;
+      }
+      return {
+        ...state,
+        audioSrc: action.src,
+      };
+    }
 
     default: {
       return state;
@@ -222,6 +236,7 @@ const musicPlayerInitState: InitStateType = {
   loop: false,
   trackReady: null,
   audioRef: { current: null },
+  audioSrc: null,
 };
 
 const [ctx, MusicPlayerProvider] = createCtx(

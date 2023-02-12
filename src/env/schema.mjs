@@ -24,6 +24,7 @@ export const serverSchema = z.object({
   API_URL: z.string(),
 
   //  spotify api
+  SPOTIFY_API_ENDPOINT: z.string(),
   SPOTIFY_CLIENT_ID: z.string(),
   SPOTIFY_CLIENT_SECRET: z.string(),
 });
@@ -44,6 +45,7 @@ export const serverEnv = {
   API_URL: process.env.API_URL,
 
   //  spotify api
+  SPOTIFY_API_ENDPOINT: process.env.SPOTIFY_API_ENDPOINT,
   SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
   SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
 };

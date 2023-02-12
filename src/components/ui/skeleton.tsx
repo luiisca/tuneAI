@@ -74,7 +74,7 @@ const SkeletonText: React.FC<SkeletonBaseProps & { invisible?: boolean }> = ({
       className={cn(
         `font-size-0 inline-block animate-pulse rounded-md bg-gray-300 empty:before:inline-block empty:before:content-['']`,
         invisible ? "invisible" : "",
-        "dark:bg-slate-900",
+        "dark:bg-slate-700",
         className
       )}
     />
