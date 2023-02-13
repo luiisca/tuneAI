@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import {
   PropsWithChildren,
-  useCallback,
   useContext,
   useEffect,
   useReducer,
@@ -172,10 +171,12 @@ type ActionType =
     }
   | {
       type: "SELECT_SONG";
-      songId: string;
+      songPos: number;
+      position?: "prev" | "next";
     };
 
 type PlayerSong = {
+  position: number;
   id: string;
   title: string;
   artists: string[];
@@ -253,28 +254,49 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
       };
     }
     case "SELECT_SONG": {
-      const songPos =
-        state.songsList &&
-        state.songsList.findIndex((song) => song.id === action.songId);
+      // determine if forward or backward
+      const prev = action.position === "prev";
+      const next = action.position === "next";
+      const positionId = prev
+        ? action.songPos - 1
+        : next
+        ? action.songPos + 1
+        : action.songPos;
 
+      const nonNegativeSongPos =
+        action.songPos === 0 || (action.songPos && action.songPos > 0);
+      const getClosestPlayableSong = () => {
+        if (state.songsList && !state.songsList[positionId]?.audioSrc) {
+          for (
+            let i = positionId;
+            prev ? i >= 0 : i < state.songsList.length;
+            prev ? i-- : i++
+          ) {
+            if (state.songsList[i]?.audioSrc) {
+              return state.songsList[i];
+            }
+          }
+        }
+
+        if (state.songsList) {
+          return state.songsList[positionId];
+        }
+      };
       // set audioRef src
       if (
         state.audioRef &&
         state.audioRef.current &&
-        (songPos === 0 || songPos) &&
+        nonNegativeSongPos &&
         state.songsList
       ) {
-        state.audioRef.current.src = state.songsList[songPos]?.audioSrc || "";
+        state.audioRef.current.src = getClosestPlayableSong()?.audioSrc || "";
       }
 
       return {
         ...state,
-        crrPlayingId: action.songId,
+        crrPlayingPos: action.songPos,
         crrPlayingSong:
-          (state.songsList &&
-            state.songsList[
-              state.songsList.findIndex((song) => song.id === action.songId)
-            ]) ||
+          (state.songsList && nonNegativeSongPos && getClosestPlayableSong()) ||
           null,
       };
     }
@@ -312,14 +334,7 @@ const MusicPlayer = () => {
   const { status } = useSession();
 
   const {
-    state: {
-      crrPlayingSong,
-      songsList,
-      crrPlayingId,
-      scanning,
-      loop,
-      trackReady,
-    },
+    state: { crrPlayingSong, crrPlayingId, scanning, loop, trackReady },
     dispatch,
   } = useContext(MusicPlayerContext);
 
@@ -341,41 +356,6 @@ const MusicPlayer = () => {
     typeof SliderPrimitive.Root
   > | null>(null);
 
-  const updateSliderPosition = useCallback(
-    (soundVal: number) => {
-      if (sliderRef.current) {
-        const sliderElement = Array.from(
-          sliderRef.current.children as HTMLCollectionOf<HTMLElement>
-        );
-        if (sliderElement[0]) {
-          const sliderTrack = Array.from(
-            sliderElement[0].children as HTMLCollectionOf<HTMLElement>
-          );
-          if (sliderTrack[0]) {
-            sliderTrack[0].style.right = `${100 - soundVal}%`;
-          }
-        }
-        if (sliderElement[1]) {
-          sliderElement[1].style.left = `calc(
-                    ${soundVal}% +
-                    ${
-                      Math.floor(soundVal) === 0
-                        ? "6px"
-                        : soundVal === 100
-                        ? "-6px"
-                        : "3px"
-                    }
-                  )`;
-        }
-      }
-    },
-    [sliderRef.current?.children, sliderRef.current?.children[1]]
-  );
-
-  useEffect(() => {
-    updateSliderPosition(initSoundVal);
-  }, []);
-
   if (status !== "loading" && status !== "authenticated") return null;
 
   if (status === "authenticated") {
@@ -395,8 +375,7 @@ const MusicPlayer = () => {
         <audio
           ref={audioRef}
           loop={loop}
-          onLoadStart={(e) => {
-            // console.log("ON LOAD START", e);
+          onLoadStart={() => {
             dispatch({ type: "SET_TRACK_READY", ready: false });
           }}
           onLoadedData={(e) => {
@@ -404,7 +383,7 @@ const MusicPlayer = () => {
             setDuration(e.target.duration);
             setCrrSoundPerc(e.target.volume);
           }}
-          onCanPlay={(e) => {
+          onCanPlay={() => {
             // console.log("ON CANPLAY", e);
             dispatch({ type: "SET_TRACK_READY", ready: true });
             if (audioRef.current) {
@@ -413,22 +392,22 @@ const MusicPlayer = () => {
             dispatch({ type: "TOGGLE_PLAY", playing: true });
           }}
           onTimeUpdate={(e) => {
-            // console.log("ON TIME UPDATE", e);
-            // console.log("duration", duration);
             const percentage = e.target.currentTime / duration;
 
-            // console.log("percentage", percentage);
             setCrrSongPerc(percentage);
-            // updateSliderPosition(Math.floor(percentage));
           }}
-          onWaiting={(e) => {
-            // console.log("ON WAITING", e);
+          onWaiting={() => {
             dispatch({ type: "SET_TRACK_READY", ready: false });
           }}
-          onEnded={(e) => {
-            // console.log("ON ENDED", e);
+          onEnded={() => {
             dispatch({ type: "TOGGLE_PLAY", playing: false });
-            // go to next song
+            if (crrPlayingSong) {
+              dispatch({
+                type: "SELECT_SONG",
+                position: "next",
+                songPos: crrPlayingSong.position,
+              });
+            }
           }}
           className="absolute top-0 left-0 z-50"
         />
@@ -459,8 +438,10 @@ const MusicPlayer = () => {
                 </div>
                 {/* Text */}
                 <div className="dark:slate-50 w-full text-sm">
-                  <p className="font-bold">{crrPlayingSong.title}</p>
-                  <p className="font-normal">{crrPlayingSong.artists[0]}</p>
+                  <p className="truncate font-bold">{crrPlayingSong.title}</p>
+                  <p className="truncate font-normal">
+                    {crrPlayingSong.artists[0]}
+                  </p>
                 </div>
                 {/* controls */}
                 <div className="absolute right-0 z-50 flex h-full">
@@ -549,10 +530,12 @@ const MusicPlayer = () => {
                     </div>
                   ) : (
                     <>
-                      <p className="text-2xl font-bold">
+                      <p className="truncate text-2xl font-bold">
                         {crrPlayingSong.title}
                       </p>
-                      <p className="font-normal">Artist name</p>
+                      <p className="truncate font-normal">
+                        {crrPlayingSong.artists[0]}
+                      </p>
                     </>
                   )}
                 </div>
@@ -640,8 +623,8 @@ const MusicPlayer = () => {
               {/* Text */}
               {crrPlayingSong && (
                 <div className="dark:slate-50 mx-3.5 text-sm ">
-                  <p>{crrPlayingSong.title}</p>
-                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">
+                  <p className="truncate">{crrPlayingSong.title}</p>
+                  <p className="truncate text-[0.6875rem] text-slate-500 dark:text-slate-400">
                     {crrPlayingSong.artists[0]}
                   </p>
                 </div>
@@ -802,9 +785,14 @@ const MusicPlayer = () => {
 
 const PlaybackControls = ({ className }: { className?: string }) => {
   const {
-    state: { scanning, loop, trackReady },
+    state: { songsList, crrPlayingSong, scanning, loop, trackReady },
     dispatch,
   } = useContext(MusicPlayerContext);
+  const firstSong = crrPlayingSong ? crrPlayingSong.position === 0 : false;
+  const lastSong =
+    crrPlayingSong && songsList?.length
+      ? songsList.length - 1 === crrPlayingSong.position
+      : false;
 
   return (
     <div
@@ -838,16 +826,26 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       <button
         className={cn(
           "group p-3 md:p-2",
-          scanning && "cursor-not-allowed text-slate-400"
+          (scanning || firstSong) && "cursor-not-allowed text-slate-400"
         )}
-        disabled={scanning}
+        disabled={scanning || firstSong}
+        onClick={() => {
+          if (crrPlayingSong && !firstSong) {
+            dispatch({
+              type: "SELECT_SONG",
+              position: "prev",
+              songPos: crrPlayingSong.position,
+            });
+          }
+        }}
       >
         <SkipBack
           className={cn(
             "h-8 w-8 fill-current md:h-4 md:w-4",
             !scanning &&
+              !firstSong &&
               "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            scanning && "fill-slate-400 md:text-slate-400"
+            (scanning || firstSong) && "fill-slate-400 md:text-slate-400"
           )}
         />
       </button>
@@ -875,15 +873,26 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       <button
         className={cn(
           "group p-3 md:p-2",
-          scanning && "cursor-not-allowed text-slate-400"
+          (scanning || lastSong) && "cursor-not-allowed text-slate-400"
         )}
+        disabled={scanning || lastSong}
+        onClick={() => {
+          if (crrPlayingSong && !lastSong) {
+            dispatch({
+              type: "SELECT_SONG",
+              position: "next",
+              songPos: crrPlayingSong.position,
+            });
+          }
+        }}
       >
         <SkipForward
           className={cn(
             "h-8 w-8 fill-current md:h-4 md:w-4",
             !scanning &&
+              !lastSong &&
               "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            scanning && "fill-slate-400 md:text-slate-400"
+            (scanning || lastSong) && "fill-slate-400 md:text-slate-400"
           )}
         />
       </button>

@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/core/button";
 import { Input } from "@/components/ui/core/input";
 import Shell from "@/components/ui/core/shell";
 import { api } from "@/utils/api";
@@ -25,11 +24,13 @@ const Discover = () => {
     enabled: !!searchValue.trim(),
   });
   const { dispatch } = useContext(MusicPlayerContext);
+
   useEffect(() => {
     if (recomSongs) {
       dispatch({
         type: "SAVE_SONGS",
-        songs: recomSongs.map((song) => ({
+        songs: recomSongs.map((song, index) => ({
+          position: index,
           id: song.id,
           title: song.title,
           artists: song.artists,
@@ -70,15 +71,15 @@ const Discover = () => {
         />
       ) : (
         <ul className="mb-[88px] mt-4 space-y-2 overflow-y-auto pb-2">
-          {recomSongs.map((song, i) => (
+          {recomSongs.map((song, index) => (
             <li
-              key={i}
+              key={index}
               onClick={() => {
                 if (song.previewUrl) {
                   console.log("SONG previewurl", song.previewUrl);
                   dispatch({
                     type: "SELECT_SONG",
-                    songId: song.id,
+                    songPos: index,
                   });
                 } else {
                   showToast("Cannot play. Sorry", "error");

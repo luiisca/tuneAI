@@ -1,5 +1,4 @@
 import { env } from "@/env/server.mjs";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
