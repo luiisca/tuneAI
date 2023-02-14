@@ -15,12 +15,11 @@ import Image from "next/image";
 import { formatSongDuration } from "@/utils/song-time";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { Button } from "@/components/ui/core/button";
-
-const DEFAULT_RESULTS_QTT = 10;
+import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
 
 const ItemSkeleton = () => {
   return (
-    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 bg-gray-200 p-2 px-4 dark:bg-slate-900">
+    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 px-4 dark:bg-slate-900">
       {/* number */}
       <div className="flex h-full w-full items-center space-x-4">
         <SkeletonText className="my-auto h-1/3 w-4" />
@@ -33,7 +32,7 @@ const ItemSkeleton = () => {
           <SkeletonText className="h-4 w-1/4 text-sm" />
         </div>
       </div>
-      <SkeletonText className="my-auto h-1/3 w-[5ch]" />
+      <SkeletonText className="my-auto h-1/3 w-[4ch]" />
       {/* time */}
     </div>
   );
@@ -42,11 +41,11 @@ const ListSkeleton = () => {
   return (
     <SkeletonContainer>
       <div className="space-y-2">
-        <ItemSkeleton />
-        <ItemSkeleton />
-        <ItemSkeleton />
-        <ItemSkeleton />
-        <ItemSkeleton />
+        {Array(DEFAULT_RESULTS_QTT)
+          .fill(null)
+          .map((_, id) => (
+            <ItemSkeleton key={id} />
+          ))}
       </div>
     </SkeletonContainer>
   );
@@ -57,6 +56,7 @@ const Discover = () => {
   const [resultsPage, setResultsPage] = useState(1);
   const [resultsQtt, setResultsQtt] = useState(DEFAULT_RESULTS_QTT);
   const [loadingMore, setLoadingMore] = useState(false);
+  const utils = api.useContext();
 
   const {
     data: recomSongs,
@@ -67,8 +67,31 @@ const Discover = () => {
   } = api.searchAi.getSongs.useQuery(
     { text: searchValue, first: resultsQtt },
     {
-      enabled: !!searchValue.trim() || !!resultsQtt,
+      enabled: !!searchValue.trim() && !!resultsQtt,
       keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      onSuccess: () => {
+        const prevData = utils.searchAi.getSongs.getData({
+          text: searchValue,
+          first: resultsQtt - DEFAULT_RESULTS_QTT,
+        });
+
+        utils.searchAi.getSongs.setData(
+          {
+            text: searchValue,
+            first: resultsQtt,
+          },
+          (oldData) => {
+            if (prevData && oldData) {
+              return [...prevData, ...oldData];
+            }
+
+            return oldData;
+          }
+        );
+      },
     }
   );
   const { dispatch } = useContext(MusicPlayerContext);
@@ -94,8 +117,10 @@ const Discover = () => {
     const main = document.getElementsByTagName("main");
     main[0] && main[0].scrollTo({ top: main[0].scrollHeight });
 
-    setLoadingMore(false);
-  }, [isFetched && loadingMore]);
+    if (isFetched) {
+      setLoadingMore(false);
+    }
+  }, [isFetching && loadingMore]);
 
   return (
     <Shell heading="Discover" subtitle="Find new songs with AI">
@@ -106,13 +131,14 @@ const Discover = () => {
           if (text.trim()) {
             setSearchValue(text);
             setResultsQtt(DEFAULT_RESULTS_QTT);
+            setResultsPage(1);
             // const songs = await utils.searchAi.getSongs.fetch(text);
           }
         }, 800)}
         className="mb-4"
         autoFocus
       />
-      {!recomSongs && isFetching && !loadingMore && <ListSkeleton />}
+      {isFetching && !loadingMore && <ListSkeleton />}
       {isError && (
         <Alert
           severity="error"
@@ -130,71 +156,73 @@ const Discover = () => {
 
       {recomSongs && recomSongs.length !== 0 && (
         <div>
-          <ul className="space-y-2 overflow-y-auto pb-2">
-            {recomSongs.map((song, index) => (
-              <li
-                key={index}
-                onClick={(e) => {
-                  if (!e.target.closest("button")) {
-                    if (song.previewUrl) {
-                      dispatch({
-                        type: "SELECT_SONG",
-                        songPos: index,
-                      });
-                    } else {
-                      showToast("Cannot play. Sorry", "error");
+          {(!isFetching || (isFetching && loadingMore)) && (
+            <ul className="space-y-2 overflow-y-auto pb-2">
+              {recomSongs.map((song, index) => (
+                <li
+                  key={index}
+                  onClick={(e) => {
+                    if (!e.target.closest("button")) {
+                      if (song.previewUrl) {
+                        dispatch({
+                          type: "SELECT_SONG",
+                          songPos: index,
+                        });
+                      } else {
+                        showToast("Cannot play. Sorry", "error");
+                      }
                     }
-                  }
-                }}
-                className={cn(
-                  "flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4 hover:bg-slate-100 dark:hover:bg-slate-700",
-                  !song.previewUrl && "cursor-not-allowed opacity-40"
-                )}
-              >
-                <div className="flex h-full space-x-4">
-                  <span className="flex w-4 items-center  justify-center font-semibold">
-                    {index + 1}
-                  </span>
-                  <div className="relative h-10 w-10 ">
-                    <Image
-                      alt={`${song.title} playing`}
-                      fill
-                      placeholder="blur"
-                      blurDataURL={`data:image/svg+xml;base64,${toBase64(
-                        shimmer(700, 475)
-                      )}`}
-                      sizes="20vw"
-                      src={song.coverUrl || "/defaultSongCover.jpeg"}
-                      className="object-cover"
-                    />
+                  }}
+                  className={cn(
+                    "flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4 hover:bg-slate-100 dark:hover:bg-slate-700",
+                    !song.previewUrl && "cursor-not-allowed opacity-40"
+                  )}
+                >
+                  <div className="flex h-full space-x-4">
+                    <span className="flex w-4 items-center  justify-center font-semibold">
+                      {index + 1}
+                    </span>
+                    <div className="relative h-10 w-10 ">
+                      <Image
+                        alt={`${song.title} playing`}
+                        fill
+                        placeholder="blur"
+                        blurDataURL={`data:image/svg+xml;base64,${toBase64(
+                          shimmer(700, 475)
+                        )}`}
+                        sizes="20vw"
+                        src={song.coverUrl || "/defaultSongCover.jpeg"}
+                        className="object-cover"
+                      />
+                    </div>
+                    <div>
+                      <p className="truncate">{song.title}</p>
+                      <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+                        {song.artists[0]}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="truncate">{song.title}</p>
-                    <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-                      {song.artists[0]}
-                    </p>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center">
+                      <ScanSimilarsBttn
+                        disabled={!song.previewUrl}
+                        index={index}
+                      />
+                      <FavouriteBttn
+                        className="group"
+                        iconClassName="h-4 w-4"
+                        songPos={index}
+                        disabled={!song.previewUrl}
+                      />
+                    </div>
+                    <span className="flex w-[5ch] justify-end text-end text-sm tabular-nums text-slate-600 dark:text-slate-300">
+                      {formatSongDuration(song.duration)}
+                    </span>
                   </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center">
-                    <ScanSimilarsBttn
-                      disabled={!song.previewUrl}
-                      index={index}
-                    />
-                    <FavouriteBttn
-                      className="group"
-                      iconClassName="h-4 w-4"
-                      songPos={index}
-                      disabled={!song.previewUrl}
-                    />
-                  </div>
-                  <span className="flex w-[5ch] justify-end text-end text-sm tabular-nums text-slate-600 dark:text-slate-300">
-                    {formatSongDuration(song.duration)}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
           {isFetching && loadingMore && <ListSkeleton />}
           <div className="mt-4 w-full text-center">
             <Button
