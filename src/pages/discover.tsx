@@ -94,7 +94,10 @@ const Discover = () => {
       },
     }
   );
-  const { dispatch } = useContext(MusicPlayerContext);
+  const {
+    state: { crrPlayingSong },
+    dispatch,
+  } = useContext(MusicPlayerContext);
 
   useEffect(() => {
     if (recomSongs) {
@@ -174,15 +177,15 @@ const Discover = () => {
                     }
                   }}
                   className={cn(
-                    "flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4 hover:bg-slate-100 dark:hover:bg-slate-700",
+                    "group flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4 hover:bg-slate-100 dark:hover:bg-slate-700",
                     !song.previewUrl && "cursor-not-allowed opacity-40"
                   )}
                 >
-                  <div className="flex h-full space-x-4">
-                    <span className="flex w-4 items-center  justify-center font-semibold">
+                  <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
+                    <span className="flex w-4 flex-shrink-0  items-center justify-center font-semibold">
                       {index + 1}
                     </span>
-                    <div className="relative h-10 w-10 ">
+                    <div className="relative h-10 w-10 flex-shrink-0">
                       <Image
                         alt={`${song.title} playing`}
                         fill
@@ -195,7 +198,7 @@ const Discover = () => {
                         className="object-cover"
                       />
                     </div>
-                    <div>
+                    <div className="overflow-hidden">
                       <p className="truncate">{song.title}</p>
                       <p className="truncate text-sm text-slate-500 dark:text-slate-400">
                         {song.artists[0]}
@@ -207,9 +210,10 @@ const Discover = () => {
                       <ScanSimilarsBttn
                         disabled={!song.previewUrl}
                         index={index}
+                        className="opacity-0 group-hover:opacity-100"
                       />
                       <FavouriteBttn
-                        className="group"
+                        className="group opacity-0 group-hover:opacity-100"
                         iconClassName="h-4 w-4"
                         songPos={index}
                         disabled={!song.previewUrl}

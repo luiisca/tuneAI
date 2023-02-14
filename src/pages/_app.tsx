@@ -63,10 +63,14 @@ const fontSans = FontSans({
 export const ScanSimilarsBttn = ({
   index,
   musicPlayer,
+  className,
+  iconClassName,
   ...props
 }: React.ComponentProps<typeof Button> & {
   index?: number;
   musicPlayer?: boolean;
+  className?: string;
+  iconClassName?: string;
 }) => {
   const {
     state: { songsList, crrPlayingSong },
@@ -85,7 +89,11 @@ export const ScanSimilarsBttn = ({
   return (
     <button
       {...props}
-      className={cn("group p-3 md:p-2", disabled && "cursor-not-allowed")}
+      className={cn(
+        "group p-3 md:p-2",
+        disabled && "cursor-not-allowed",
+        className
+      )}
       onClick={() => {
         if (!disabled) {
           dispatch({
@@ -107,9 +115,10 @@ export const ScanSimilarsBttn = ({
     >
       <ScanLine
         className={cn(
-          "md:h-4 md:w-4",
-          "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-          scanning && "!text-accentBright "
+          "h-4 w-4",
+          "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
+          scanning && "!text-accentBright",
+          iconClassName
         )}
       />
     </button>
@@ -408,7 +417,7 @@ const MusicPlayer = () => {
   } = useContext(MusicPlayerContext);
 
   const [playerOpen, setPlayerOpen] = useState(false);
-  const [soundHovered, setSoundHovered] = useState(true);
+  const [soundHovered, setSoundHovered] = useState(false);
 
   const [crrSoundPerc, setCrrSoundPerc] = useState<number>(DEFAULT_SOUND);
   const [initSoundVal, setInitSoundVal] = useState<number>(DEFAULT_SOUND);
@@ -867,6 +876,7 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       <ScanSimilarsBttn
         disabled={!crrPlayingSong}
         index={crrPlayingSong?.position as number}
+        iconClassName="h-6 w-6 md:h-4 md:w-4"
       />
 
       {/* back button */}
