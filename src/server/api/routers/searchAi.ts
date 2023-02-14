@@ -4,9 +4,9 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
 const searchSongsQueryDocument = `
-query FreeTextSearch($text: String!) {
+query FreeTextSearch($text: String!, $first: Int!) {
   freeTextSearch(
-    first: 10
+    first: $first
     target: { spotify: {} }
     searchText: $text
   ) {
@@ -70,13 +70,14 @@ export type SongType = {
 };
 
 // cianity api calls
-const getAiRecomSongs = async (text: string) => {
+const getAiRecomSongs = async (text: string, first: number) => {
   const res = await fetch(env.API_URL, {
     method: "POST",
     body: JSON.stringify({
       query: searchSongsQueryDocument,
       variables: {
         text,
+        first,
       },
     }),
     headers: {
@@ -130,13 +131,19 @@ const getSpotifyTrackData = async (trackId: string, refreshToken: string) => {
 // routers
 export const searchAiRouter = createTRPCRouter({
   getSongs: publicProcedure
-    .input(z.string())
-    .query(async ({ ctx, input: text }) => {
+    .input(
+      z.object({
+        text: z.string(),
+        first: z.number(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
       const { session } = ctx;
+      const { text, first } = input;
       let songs: SongType[] = [];
 
       if (session) {
-        const recomSongsRes = await getAiRecomSongs(text);
+        const recomSongsRes = await getAiRecomSongs(text, first);
         console.log("RECOM SONGS RESP", recomSongsRes);
 
         const promises = recomSongsRes.map(async (recomSong) => {

@@ -217,7 +217,6 @@ type ActionType =
       type: "SET_SCANNING";
       index: number;
       scanning: boolean;
-      musicPlayer: boolean;
     }
   | {
       type: "TOGGLE_LOOP";
@@ -746,28 +745,28 @@ const MusicPlayer = () => {
               </div>
             </div>
             <div className="mr-1 flex w-full items-center justify-end">
-              <button
-                className={cn("group p-2", scanning && "cursor-not-allowed")}
-                disabled={scanning}
-                onClick={() => {
-                  showToast("Coming Soon!", "warning");
-                }}
-              >
-                <MonitorSpeaker
-                  className={cn(
-                    "h-4 w-4",
-                    !scanning &&
-                      "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
-                    scanning && "text-slate-400"
-                  )}
-                />
-              </button>
-              <div className="relative flex w-1/2 items-center">
+              <div className="relative flex w-full items-center justify-end">
+                <button
+                  className={cn("group p-2", scanning && "cursor-not-allowed")}
+                  disabled={scanning ?? false}
+                  onClick={() => {
+                    showToast("Coming Soon!", "warning");
+                  }}
+                >
+                  <MonitorSpeaker
+                    className={cn(
+                      "h-4 w-4",
+                      !scanning &&
+                        "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
+                      scanning && "text-slate-400"
+                    )}
+                  />
+                </button>
                 <button
                   className={cn("group p-2", scanning && "cursor-not-allowed")}
                   onMouseEnter={() => setSoundHovered(true)}
                   onMouseLeave={() => setSoundHovered(false)}
-                  disabled={scanning}
+                  disabled={scanning ?? false}
                   onClick={() => {
                     if (crrSoundPerc <= MIN_VOL_TO_MUTE) {
                       // come back to prev vol if user manually droppes volume to mutable levels
@@ -813,6 +812,7 @@ const MusicPlayer = () => {
                 </button>
                 {/* volume slider */}
                 <Slider
+                  className="max-w-[100px]"
                   max={1}
                   step={0.01}
                   disabled={!trackReady}
@@ -976,9 +976,10 @@ const PlayBttn = ({
   iconClassName: string;
 }) => {
   const {
-    state: { playing, scanning, trackReady, audioRef },
+    state: { crrPlayingSong, playing, trackReady, audioRef },
     dispatch,
   } = useContext(MusicPlayerContext);
+  const scanning = crrPlayingSong?.scanning;
 
   return (
     <button

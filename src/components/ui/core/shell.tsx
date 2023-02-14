@@ -106,7 +106,7 @@ export default function Shell(props: LayoutProps) {
   return (
     <div className="flex h-screen overflow-hidden">
       {props.SidebarContainer || <SideBar />}
-      <div className="flex w-0 flex-1 flex-col overflow-hidden">
+      <div className="mb-24 flex w-0 flex-1 flex-col overflow-hidden">
         <MainContainer {...props} />
       </div>
     </div>
@@ -444,7 +444,7 @@ function MainContainer({
       />
       {SettingsSidebarContainerProp}
 
-      <div className="flex h-screen flex-col px-4 py-2 lg:py-8 lg:px-12">
+      <div className="flex flex-col px-4 py-2 lg:py-8 lg:px-12">
         {/* add padding to top for mobile when App Bar is fixed */}
         <div className="pt-14 sm:hidden" />
         {!props.withoutMain ? (
