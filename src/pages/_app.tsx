@@ -59,52 +59,111 @@ const fontSans = FontSans({
   display: "swap",
 });
 
-const FavouriteBttn = ({
+export const ScanSimilarsBttn = ({
+  index,
+  musicPlayer,
+  ...props
+}: React.ComponentProps<typeof Button> & {
+  index?: number;
+  musicPlayer?: boolean;
+}) => {
+  const {
+    state: { songsList, crrPlayingSong },
+    dispatch,
+  } = useContext(MusicPlayerContext);
+  const scanning =
+    (songsList &&
+      (index === 0 || (index && index > 0)) &&
+      songsList[index]?.scanning) ||
+    crrPlayingSong?.scanning;
+
+  const disabled = props.disabled || scanning;
+
+  index = crrPlayingSong?.position || index;
+
+  return (
+    <button
+      {...props}
+      className={cn("group p-3 md:p-2", disabled && "cursor-not-allowed")}
+      onClick={() => {
+        if (!disabled) {
+          dispatch({
+            type: "SET_SCANNING",
+            index: index as number,
+            scanning: true,
+          });
+          showToast("Discovering similar songs!", "success");
+          setTimeout(() => {
+            dispatch({
+              type: "SET_SCANNING",
+              index: index as number,
+              scanning: false,
+            });
+            showToast("10 songs found", "success");
+          }, 3000);
+        }
+      }}
+    >
+      <ScanLine
+        className={cn(
+          "md:h-4 md:w-4",
+          "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
+          scanning && "!text-accentBright "
+        )}
+      />
+    </button>
+  );
+};
+export const FavouriteBttn = ({
   className,
   iconClassName,
-  songId,
+  songPos,
   ...props
 }: React.ComponentProps<typeof Button> & {
   className?: string;
   iconClassName?: string;
-  songId: string;
+  songPos: number;
 }) => {
   const {
-    state: { songsList, scanning },
+    state: { songsList, crrPlayingSong },
     dispatch,
   } = useContext(MusicPlayerContext);
-  const { current: favourite } = useRef(
-    songsList &&
-      songsList[songsList.findIndex((song) => song.id === songId)]?.favourite
-  );
+  const song =
+    (songsList &&
+      (songPos === 0 || (songPos && songPos > 0)) &&
+      songsList[songPos]) ||
+    crrPlayingSong;
+
+  console.log("SONG", song);
+  const scanning = song && song.scanning;
+  const favourite = song && song.favourite;
+  const disabled = props.disabled || scanning;
 
   return (
     <button
       {...props}
       className={cn(
         "p-2",
-        scanning && "cursor-not-allowed",
+        disabled && "cursor-not-allowed",
         className ? className : ""
       )}
       onClick={() => {
-        if (songsList) {
-          const songPos = songsList.findIndex((song) => song.id === songId);
+        if (songsList && !disabled) {
           !favourite && showToast("Coming Soon!", "warning");
-          dispatch({ type: "TOGGLE_FAVOURITE", songPos });
+          dispatch({ type: "TOGGLE_FAVOURITE", songPos, favourite: true });
           setTimeout(() => {
-            dispatch({ type: "TOGGLE_FAVOURITE", songPos });
+            dispatch({ type: "TOGGLE_FAVOURITE", songPos, favourite: false });
           }, 1000);
         }
       }}
-      disabled={scanning}
     >
       <Heart
         className={cn(
           "text-slate-600 dark:text-slate-400",
-          !scanning &&
+          !disabled &&
             !favourite &&
             "group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
-          scanning && "text-slate-400",
+          disabled && "text-slate-400",
           favourite && "fill-accent text-accent dark:text-accent",
           iconClassName
         )}
@@ -148,15 +207,17 @@ type ActionType =
   | {
       type: "TOGGLE_PLAY";
       playing?: boolean;
-      // payload: src, ai analysis
     }
   | {
       type: "TOGGLE_FAVOURITE";
       songPos: number;
+      favourite: boolean;
     }
   | {
       type: "SET_SCANNING";
+      index: number;
       scanning: boolean;
+      musicPlayer: boolean;
     }
   | {
       type: "TOGGLE_LOOP";
@@ -179,6 +240,7 @@ type PlayerSong = {
   position: number;
   id: string;
   title: string;
+  scanning: boolean;
   artists: string[];
   coverUrl: string;
   favourite: boolean;
@@ -190,7 +252,6 @@ type InitStateType = {
   playing: boolean;
   crrPlayingId: string | null;
   crrPlayingSong: PlayerSong | null;
-  scanning: boolean;
   loop: boolean;
   trackReady: boolean | null;
 };
@@ -210,30 +271,43 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
       };
     }
     case "TOGGLE_FAVOURITE": {
-      if (
-        state.songsList &&
-        state.crrPlayingId &&
-        state.songsList[action.songPos] !== undefined
-      ) {
+      if (state.songsList) {
+        let newSongsList = state.songsList;
+        let newSongItem = newSongsList[action.songPos];
+
+        if (newSongItem) {
+          newSongsList[action.songPos] = {
+            ...newSongItem,
+            favourite: action.favourite,
+          };
+        }
         return {
           ...state,
-          songsList: [
-            ...state.songsList,
-            {
-              ...state.songsList[action.songPos],
-              favourite: !state.songsList[action.songPos]?.favourite,
-            },
-          ],
-        } as InitStateType;
+          songsList: [...newSongsList],
+        };
       }
 
       return state;
     }
     case "SET_SCANNING": {
-      return {
-        ...state,
-        scanning: action.scanning,
-      };
+      if (state.songsList) {
+        let newSongsList = state.songsList;
+        let newSongItem = newSongsList[action.index];
+
+        if (newSongItem) {
+          newSongsList[action.index] = {
+            ...newSongItem,
+            scanning: action.scanning,
+          };
+        }
+
+        return {
+          ...state,
+          songsList: [...newSongsList],
+        };
+      }
+
+      return state;
     }
     case "TOGGLE_LOOP": {
       return {
@@ -265,6 +339,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
 
       const nonNegativeSongPos =
         action.songPos === 0 || (action.songPos && action.songPos > 0);
+
       const getClosestPlayableSong = () => {
         if (state.songsList && !state.songsList[positionId]?.audioSrc) {
           for (
@@ -311,7 +386,6 @@ const musicPlayerInitState: InitStateType = {
   playing: false,
   crrPlayingId: null,
   crrPlayingSong: null,
-  scanning: false,
   loop: false,
 
   songsList: null,
@@ -324,17 +398,12 @@ const [ctx, MusicPlayerProvider] = createCtx(
   musicPlayerInitState
 );
 export const MusicPlayerContext = ctx;
-const songs = [
-  {
-    src: "https://s3-us-west-2.amazonaws.com/s.cdpn.io/858/outfoxing.mp3",
-  },
-];
 
 const MusicPlayer = () => {
   const { status } = useSession();
 
   const {
-    state: { crrPlayingSong, crrPlayingId, scanning, loop, trackReady },
+    state: { crrPlayingSong, loop, trackReady },
     dispatch,
   } = useContext(MusicPlayerContext);
 
@@ -356,22 +425,13 @@ const MusicPlayer = () => {
     typeof SliderPrimitive.Root
   > | null>(null);
 
+  const scanning = crrPlayingSong && crrPlayingSong.scanning;
+
   if (status !== "loading" && status !== "authenticated") return null;
 
   if (status === "authenticated") {
     return (
       <>
-        <div className="absolute top-0 right-0 z-50 flex space-x-2">
-          <Button
-            onClick={() => {
-              if (audioRef && audioRef.current && songs[0]) {
-                audioRef.current.src = songs[0].src;
-              }
-            }}
-          >
-            Load song
-          </Button>
-        </div>
         <audio
           ref={audioRef}
           loop={loop}
@@ -445,7 +505,9 @@ const MusicPlayer = () => {
                 </div>
                 {/* controls */}
                 <div className="absolute right-0 z-50 flex h-full">
-                  {crrPlayingId && <FavouriteBttn songId={crrPlayingId} />}
+                  {crrPlayingSong && (
+                    <FavouriteBttn songPos={crrPlayingSong.position} />
+                  )}
                   <PlayBttn
                     className={cn(
                       "relative p-2",
@@ -469,49 +531,45 @@ const MusicPlayer = () => {
           )}
 
           {/* mobile overlay player */}
-          {playerOpen && crrPlayingSong && (
-            <aside
-              className={cn(
-                "fixed inset-0 flex h-screen w-screen transform flex-col transition duration-200 ease-in-out md:hidden",
-                "bg-gradient-to-b from-gray-50 to-gray-100 p-3",
-                "dark:from-slate-800 dark:to-slate-900",
-                playerOpen ? "translate-y-0" : "translate-y-full"
-              )}
-            >
-              {/* close and more */}
-              <div className="mb-10 flex w-full items-center">
-                <button className="p-2" onClick={() => setPlayerOpen(false)}>
-                  <ChevronDown className="h-8 w-8" />
-                </button>
+          <aside
+            className={cn(
+              "fixed inset-0 flex h-screen w-screen transform flex-col transition duration-200 ease-in-out md:hidden",
+              "bg-gradient-to-b from-gray-50 to-gray-100 p-3",
+              "dark:from-slate-800 dark:to-slate-900",
+              playerOpen ? "translate-y-0" : "translate-y-full"
+            )}
+          >
+            {/* close and more */}
+            <div className="mb-10 flex w-full items-center">
+              <button className="p-2" onClick={() => setPlayerOpen(false)}>
+                <ChevronDown className="h-8 w-8" />
+              </button>
 
-                <p className="dark:slate-50 w-full text-center text-sm font-bold">
-                  Similar songs
-                </p>
-                {/* {similars && <p>Similar songs</p>} */}
+              <p className="dark:slate-50 w-full text-center text-sm font-bold">
+                Similar songs
+              </p>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="p-3">
-                    <MoreHorizontal className="h-6 w-6" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="mr-3">
-                    <DropdownMenuItem
-                      className="flex items-center space-x-3"
-                      onClick={() => showToast("Coming Soon!", "warning")}
-                    >
-                      <ListPlus />
-                      <span className="font-bold">Add to Playlist</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="flex items-center space-x-3">
-                      <Disc />
-                      <span className="font-bold">View Album</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              {/* track cover */}
-              <div>
-                <div />
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="p-3">
+                  <MoreHorizontal className="h-6 w-6" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="mr-3">
+                  <DropdownMenuItem
+                    className="flex items-center space-x-3"
+                    onClick={() => showToast("Coming Soon!", "warning")}
+                  >
+                    <ListPlus />
+                    <span className="font-bold">Add to Playlist</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="flex items-center space-x-3">
+                    <Disc />
+                    <span className="font-bold">View Album</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {/* track cover */}
+            {crrPlayingSong && (
               <div className="relative mb-6 h-full p-0">
                 <Image
                   alt={`${crrPlayingSong.title} playing`}
@@ -520,7 +578,9 @@ const MusicPlayer = () => {
                   src={crrPlayingSong.coverUrl || "/defaultSongCover.jpeg"}
                 />
               </div>
-              {/* title and favourite */}
+            )}
+            {/* title and favourite */}
+            {crrPlayingSong && (
               <div className="mx-3 mb-4 flex items-center">
                 <div className="w-full">
                   {scanning ? (
@@ -539,71 +599,72 @@ const MusicPlayer = () => {
                     </>
                   )}
                 </div>
-                {crrPlayingId && (
-                  <FavouriteBttn className="p-3 pr-0" songId={crrPlayingId} />
+                <FavouriteBttn
+                  className="p-3 pr-0"
+                  songPos={crrPlayingSong.position}
+                />
+              </div>
+            )}
+
+            {/* mobile progress bar */}
+            <div className="mx-3 mb-5">
+              <Slider
+                max={1}
+                step={0.01}
+                value={[crrSongPerc]}
+                className="pt-5 pb-2"
+                onValueChange={(value) => {
+                  if (audioRef.current && value[0] && duration) {
+                    // translate value to seconds
+                    audioRef.current.currentTime = convertToSeconds(
+                      duration,
+                      value[0]
+                    );
+                  }
+                }}
+              />
+              <div className="flex justify-between text-[0.6875rem] dark:text-slate-50">
+                {scanning ? (
+                  <>
+                    <SkeletonText className="w-8" />
+                    <SkeletonText className="w-8" />
+                  </>
+                ) : (
+                  <>
+                    <span className="block h-4">
+                      {duration &&
+                        formatSongDuration(
+                          convertToSeconds(duration, crrSongPerc)
+                        )}
+                    </span>
+                    <span>{duration && formatSongDuration(duration)}</span>
+                  </>
                 )}
               </div>
+            </div>
+            {/* controls */}
+            <PlaybackControls />
+            {/* play in device and share buttons */}
+            <div className="flex justify-between">
+              <div
+                className={cn(
+                  "p-2",
 
-              {/* mobile progress bar */}
-              <div className="mx-3 mb-5">
-                <Slider
-                  max={1}
-                  step={0.01}
-                  value={[crrSongPerc]}
-                  className="pt-5 pb-2"
-                  onValueChange={(value) => {
-                    if (audioRef.current && value[0] && duration) {
-                      // translate value to seconds
-                      audioRef.current.currentTime = convertToSeconds(
-                        duration,
-                        value[0]
-                      );
-                    }
-                  }}
-                />
-                <div className="flex justify-between text-[0.6875rem] dark:text-slate-50">
-                  {scanning ? (
-                    <>
-                      <SkeletonText className="w-8" />
-                      <SkeletonText className="w-8" />
-                    </>
-                  ) : (
-                    <>
-                      <span className="block h-4">
-                        {duration &&
-                          formatSongDuration(
-                            convertToSeconds(duration, crrSongPerc)
-                          )}
-                      </span>
-                      <span>{duration && formatSongDuration(duration)}</span>
-                    </>
-                  )}
-                </div>
+                  scanning && "fill-slate-400 text-slate-400"
+                )}
+              >
+                <MonitorSpeaker className="h-4 w-4" />
               </div>
-              {/* controls */}
-              <PlaybackControls />
-              {/* play in device and share buttons */}
-              <div className="flex justify-between">
-                <div
-                  className={cn(
-                    "p-2",
-
-                    scanning && "fill-slate-400 text-slate-400"
-                  )}
-                >
-                  <MonitorSpeaker className="h-4 w-4" />
-                </div>
-                <div
-                  className={cn(
-                    "p-2",
-                    scanning && "fill-slate-400 text-slate-400"
-                  )}
-                >
-                  <Share2 className="h-4 w-4" />
-                </div>
+              <div
+                className={cn(
+                  "p-2",
+                  scanning && "fill-slate-400 text-slate-400"
+                )}
+              >
+                <Share2 className="h-4 w-4" />
               </div>
-            </aside>
-          )}
+            </div>
+          </aside>
 
           {/* DESKTOP PLAYER */}
           <div className="hidden h-24 border-t border-t-gray-100 bg-gray-50 p-4 dark:border-t-slate-700 dark:bg-slate-900 md:flex">
@@ -631,11 +692,11 @@ const MusicPlayer = () => {
               )}
 
               {/* favourite */}
-              {crrPlayingId && (
+              {crrPlayingSong && (
                 <FavouriteBttn
                   className="group"
                   iconClassName="h-4 w-4"
-                  songId={crrPlayingId}
+                  songPos={crrPlayingSong.position}
                 />
               )}
             </div>
@@ -720,7 +781,6 @@ const MusicPlayer = () => {
                       const newSoundVal = crrSoundPerc > 0 ? 0 : initSoundVal;
                       setCrrSoundPerc(newSoundVal);
                       if (audioRef.current) {
-                        console.log("newSoundVal", newSoundVal);
                         audioRef.current.volume = newSoundVal;
                       }
                     }
@@ -785,7 +845,7 @@ const MusicPlayer = () => {
 
 const PlaybackControls = ({ className }: { className?: string }) => {
   const {
-    state: { songsList, crrPlayingSong, scanning, loop, trackReady },
+    state: { songsList, crrPlayingSong, loop, trackReady },
     dispatch,
   } = useContext(MusicPlayerContext);
   const firstSong = crrPlayingSong ? crrPlayingSong.position === 0 : false;
@@ -793,6 +853,7 @@ const PlaybackControls = ({ className }: { className?: string }) => {
     crrPlayingSong && songsList?.length
       ? songsList.length - 1 === crrPlayingSong.position
       : false;
+  const scanning = crrPlayingSong?.scanning;
 
   return (
     <div
@@ -802,25 +863,10 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       )}
     >
       {/* scan button */}
-      <button
-        className="group p-3 md:p-2"
-        onClick={() => {
-          dispatch({ type: "SET_SCANNING", scanning: true });
-          showToast("Discovering similar songs!", "success");
-          setTimeout(() => {
-            dispatch({ type: "SET_SCANNING", scanning: false });
-            showToast("10 songs found", "success");
-          }, 3000);
-        }}
-      >
-        <ScanLine
-          className={cn(
-            "md:h-4 md:w-4",
-            "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            scanning && "!text-accentBright "
-          )}
-        />
-      </button>
+      <ScanSimilarsBttn
+        disabled={!crrPlayingSong}
+        index={crrPlayingSong?.position as number}
+      />
 
       {/* back button */}
       <button

@@ -493,7 +493,6 @@ export function ThemeToggle({ className }: { className?: string }) {
       variant="ghost"
       size="sm"
       onClick={() => {
-        console.log("what's goint on ");
         setTheme(resolvedTheme === "dark" ? "light" : "dark");
       }}
     >

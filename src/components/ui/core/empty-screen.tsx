@@ -23,7 +23,7 @@ export default function EmptyScreen({
       <div
         className={cn(
           "min-h-80 flex w-full flex-col items-center justify-center rounded-md border border-dashed p-7 lg:p-20",
-          "dark:border-slate-800 dark:bg-slate-700"
+          "dark:border-slate-800 dark:bg-slate-800"
         )}
       >
         <div

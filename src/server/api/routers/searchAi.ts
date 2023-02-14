@@ -61,6 +61,7 @@ export type SongType = {
   title: string;
   artists: string[];
   previewUrl: string | null;
+  duration: number;
   coverUrl: string;
   genres: string[];
   moods: string[];
@@ -115,6 +116,7 @@ const getSpotifyTrackData = async (trackId: string, refreshToken: string) => {
   });
   const data = (await res.json()) as SpotifyApi.TrackObjectFull;
   return {
+    duration: data.duration_ms / 1000,
     coverUrl:
       data?.album?.images[0]?.url ||
       data?.album?.images[1]?.url ||
