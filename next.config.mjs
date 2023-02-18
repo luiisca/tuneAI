@@ -30,5 +30,14 @@ const config = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/discover",
+        destination: "/discover/ai",
+        permanent: true,
+      },
+    ];
+  },
 };
 export default config;

@@ -1,5 +1,5 @@
 import { createTRPCRouter } from "./trpc";
-import { searchAiRouter } from "./routers/searchAi";
+import { discoverRouter } from "./routers/discover";
 import { userRouter } from "./routers/user";
 
 /**
@@ -8,7 +8,7 @@ import { userRouter } from "./routers/user";
  * All routers added in /api/routers should be manually added here
  */
 export const appRouter = createTRPCRouter({
-  searchAi: searchAiRouter,
+  discover: discoverRouter,
   user: userRouter,
 });
 

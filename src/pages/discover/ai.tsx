@@ -8,7 +8,7 @@ import EmptyScreen from "@/components/ui/core/empty-screen";
 import { CircleSlashed, Music2 } from "lucide-react";
 import { SkeletonContainer, SkeletonText } from "@/components/ui/skeleton";
 import { Alert } from "@/components/ui/alert";
-import { FavouriteBttn, MusicPlayerContext, ScanSimilarsBttn } from "./_app";
+import { FavouriteBttn, MusicPlayerContext, ScanSimilarsBttn } from "../_app";
 import { cn } from "@/utils/cn";
 import showToast from "@/components/ui/core/notifications";
 import Image from "next/image";
@@ -59,12 +59,16 @@ const Discover = () => {
   const utils = api.useContext();
 
   const {
+    state: { songsList },
+  } = useContext(MusicPlayerContext);
+
+  const {
     data: recomSongs,
     isFetching,
     isFetched,
     isError,
     error,
-  } = api.searchAi.getSongs.useQuery(
+  } = api.discover.getSongs.ai.useQuery(
     { text: searchValue, first: resultsQtt },
     {
       enabled: !!searchValue.trim() && !!resultsQtt,
@@ -73,12 +77,12 @@ const Discover = () => {
       refetchOnReconnect: false,
       refetchOnMount: false,
       onSuccess: () => {
-        const prevData = utils.searchAi.getSongs.getData({
+        const prevData = utils.discover.getSongs.ai.getData({
           text: searchValue,
           first: resultsQtt - DEFAULT_RESULTS_QTT,
         });
 
-        utils.searchAi.getSongs.setData(
+        utils.discover.getSongs.ai.setData(
           {
             text: searchValue,
             first: resultsQtt,
@@ -94,28 +98,35 @@ const Discover = () => {
       },
     }
   );
-  const {
-    state: { crrPlayingSong },
-    dispatch,
-  } = useContext(MusicPlayerContext);
+  const { dispatch } = useContext(MusicPlayerContext);
 
   useEffect(() => {
     if (recomSongs) {
+      console.log("SONGSLIST", songsList);
+      console.log("recomSongs".toUpperCase(), recomSongs);
+      const newSongs = recomSongs.slice(
+        recomSongs.length - DEFAULT_RESULTS_QTT
+      );
+
       dispatch({
         type: "SAVE_SONGS",
-        songs: recomSongs.map((song, index) => ({
-          position: index,
-          id: song.id,
-          title: song.title,
-          artists: song.artists,
-          scanning: false,
-          coverUrl: song.coverUrl,
-          favourite: false, // @TODO: get them from spotify
-          audioSrc: song.previewUrl || "",
-        })),
+        songs: [
+          ...(songsList || []),
+          ...newSongs.map((song, index) => ({
+            position: index,
+            id: song.id,
+            title: song.title,
+            artists: song.artists,
+            scanning: false,
+            coverUrl: song.coverUrl,
+            favourite: false, // @TODO: get them from spotify
+            audioSrc: song.previewUrl || "",
+          })),
+        ],
       });
     }
   }, [recomSongs]);
+
   useEffect(() => {
     const main = document.getElementsByTagName("main");
     main[0] && main[0].scrollTo({ top: main[0].scrollHeight });
