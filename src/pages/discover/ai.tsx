@@ -60,6 +60,7 @@ const Discover = () => {
 
   const {
     state: { songsList },
+    dispatch,
   } = useContext(MusicPlayerContext);
 
   const {
@@ -98,7 +99,6 @@ const Discover = () => {
       },
     }
   );
-  const { dispatch } = useContext(MusicPlayerContext);
 
   useEffect(() => {
     if (recomSongs) {

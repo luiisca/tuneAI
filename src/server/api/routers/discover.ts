@@ -153,14 +153,27 @@ const getSpotifyTracksData = async (tracksId: string, refreshToken: string) => {
   return data.tracks;
 };
 
-const getSpotifySearchResults = async (trackName: string, offset: number) => {
+const getSpotifySearchResults = async (
+  trackName: string,
+  offset: number,
+  refreshToken: string
+) => {
+  const accessToken = await getAccessToken(refreshToken);
   const query_params = new URLSearchParams({
     q: trackName,
     type: "track",
     limit: DEFAULT_RESULTS_QTT.toString(),
     offset: offset.toString(),
   });
-  const res = await fetch(`${env.SPOTIFY_API_ENDPOINT}/search?${query_params}`);
+  const res = await fetch(
+    `${env.SPOTIFY_API_ENDPOINT}/search?${query_params}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
   const data = (await res.json()) as SpotifyApi.TrackSearchResponse;
 
   return data.tracks;
@@ -234,13 +247,31 @@ export const discoverRouter = createTRPCRouter({
         })
       )
       .query(async ({ ctx, input }) => {
-        let songs;
-        const tracks = await getSpotifySearchResults(
-          input.trackName,
-          input.offset
-        );
+        const { session } = ctx;
+        const { trackName, offset } = input;
 
-        return {};
+        if (session) {
+          const tracks = (await getSpotifySearchResults(
+            trackName,
+            offset,
+            session.accessToken
+          )) as unknown as SpotifyApi.PagingObject<SpotifyApi.TrackObjectFull>;
+
+          console.log("TRACKS", tracks);
+          return tracks.items.map((track) => {
+            return {
+              id: track.id,
+              duration: track.duration_ms / 1000,
+              coverUrl:
+                track.album.images[0]?.url ||
+                track.album.images[1]?.url ||
+                "/defaultSongCover.jpeg",
+              previewUrl: track.preview_url,
+              title: track.name,
+              artists: track.artists.map((artist) => artist.name),
+            };
+          });
+        }
       }),
   }),
 });
