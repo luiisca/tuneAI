@@ -1,6 +1,6 @@
 import { cn } from "@/utils/cn";
 import { AlertCircle, AlertTriangle, CheckCircle, Info } from "lucide-react";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export interface AlertProps {
   title?: ReactNode;
@@ -15,11 +15,11 @@ export function Alert(props: AlertProps) {
   return (
     <div
       className={cn(
-        "rounded-md border border-opacity-20 p-3",
+        "rounded-md border p-3",
         props.className,
         severity === "error" &&
           cn(
-            "border-red-900 bg-red-50 text-red-800",
+            "border-red-900/20 bg-red-50 text-red-800",
             "dark:bg-red-800 dark:text-white"
           ),
         severity === "warning" &&
@@ -29,7 +29,7 @@ export function Alert(props: AlertProps) {
       )}
     >
       <div className="flex">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {severity === "error" && (
             <AlertCircle
               className={cn("h-5 w-5 text-red-400", "dark:text-white")}
@@ -52,7 +52,7 @@ export function Alert(props: AlertProps) {
             />
           )}
         </div>
-        <div className="ml-3 flex-grow">
+        <div className="ml-3 grow">
           <h3 className="text-sm font-medium">{props.title}</h3>
           <div className="text-sm">{props.message}</div>
         </div>

@@ -35,26 +35,76 @@ query FreeTextSearch($text: String!, $first: Int!) {
   }
 }
 `;
+const searchSimilarSongsQueryDocument = `
+query SimilarTracksQuery($trackId: ID!, $first: Int!) {
+  spotifyTrack(id: $trackId) {
+    ... on Error {
+      message
+    }
+    ... on Track {
+      id
+      title
+      similarTracks(first: $first, target: {spotify: {}}) {
+        ... on SimilarTracksError {
+          code
+          message
+        }
+        ... on SimilarTracksConnection {
+          edges {
+            cursor
+            node {
+              audioAnalysisV6 {
+                ... on AudioAnalysisV6Finished {
+                  result {
+                    genreTags
+                    moodTags
+                    instrumentTags
+                    musicalEraTag
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+`;
 
+type SongResult = {
+  cursor: string;
+  node: {
+    audioAnalysisV6: {
+      result: {
+        genreTags: string[];
+        moodTags: string[];
+        instrumentTags: string[];
+        musicalEraTag: string;
+      };
+    };
+  };
+};
 interface SearchSongsResult {
   data: {
     freeTextSearch: {
-      edges: {
-        cursor: string;
-        node: {
-          audioAnalysisV6: {
-            result: {
-              genreTags: string[];
-              moodTags: string[];
-              instrumentTags: string[];
-              musicalEraTag: string;
-            };
-          };
-        };
-      }[];
+      edges: SongResult[];
     };
   };
 }
+
+interface SearchSimilarSongsResult {
+  data: {
+    spotifyTrack: {
+      id: string;
+      title: string;
+      similarTracks: {
+        edges: SongResult[];
+      };
+    };
+  };
+}
+
 export type SongType = {
   id: string;
   title: string;
@@ -68,21 +118,22 @@ export type SongType = {
   musicalEra: string;
 };
 
+const getIdsString = (songs: SongResult[]) => {
+  const ids = songs.reduce((prevSongId, crrSong) => {
+    if (crrSong !== null) {
+      return prevSongId === ""
+        ? `${crrSong.cursor}`
+        : `${prevSongId},${crrSong.cursor}`;
+    }
+
+    return `${prevSongId}`;
+  }, "");
+  return ids;
+};
+
 // cianity api calls
-let uniqueIds: string[] = [];
-let uniqueSongs: ({
-  cursor: string;
-  node: {
-    audioAnalysisV6: {
-      result: {
-        genreTags: string[];
-        moodTags: string[];
-        instrumentTags: string[];
-        musicalEraTag: string;
-      };
-    };
-  };
-} | null)[] = [];
+const uniqueRecomIds: string[] = [];
+const uniqueRecomSongs: (SongResult | null)[] = [];
 
 const getAiRecomSongs = async (text: string, first: number) => {
   const res = await fetch(env.API_URL, {
@@ -101,19 +152,74 @@ const getAiRecomSongs = async (text: string, first: number) => {
   });
   const songsResult = (await res.json()) as SearchSongsResult;
 
-  const NEW_SONGS =
+  const NEW_SONGS_START_INDEX =
     first === DEFAULT_RESULTS_QTT ? 0 : first - DEFAULT_RESULTS_QTT;
-  const songs = songsResult.data.freeTextSearch.edges.slice(NEW_SONGS);
+  const songs = songsResult.data.freeTextSearch.edges.slice(
+    NEW_SONGS_START_INDEX
+  );
   songs.forEach((song) => {
-    if (!uniqueIds.includes(song.cursor)) {
-      uniqueIds.push(song.cursor);
-      uniqueSongs.push(song);
+    if (!uniqueRecomIds.includes(song.cursor)) {
+      uniqueRecomIds.push(song.cursor);
+      uniqueRecomSongs.push(song);
     }
 
-    uniqueSongs.push(null);
+    uniqueRecomSongs.push(null);
   });
 
-  return uniqueSongs;
+  return uniqueRecomSongs.slice(NEW_SONGS_START_INDEX);
+};
+
+const uniqueSimIds: string[] = [];
+const uniqueSimSongs: ({
+  cursor: string;
+  node: {
+    audioAnalysisV6: {
+      result: {
+        genreTags: string[];
+        moodTags: string[];
+        instrumentTags: string[];
+        musicalEraTag: string;
+      };
+    };
+  };
+} | null)[] = [];
+
+const getAiSimilarSongs = async (trackId: string, first: number) => {
+  const res = await fetch(env.API_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      query: searchSimilarSongsQueryDocument,
+      variables: {
+        trackId,
+        first,
+      },
+    }),
+    headers: {
+      Authorization: `Bearer ${env.ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const songsResult = (await res.json()) as SearchSimilarSongsResult;
+
+  const NEW_SONGS_START_INDEX =
+    first === DEFAULT_RESULTS_QTT ? 0 : first - DEFAULT_RESULTS_QTT;
+  console.log("SONGS RESULT", songsResult.data.spotifyTrack.similarTracks);
+  console.log("EDGES", songsResult.data.spotifyTrack.similarTracks.edges);
+  const songs = songsResult.data.spotifyTrack.similarTracks.edges.slice(
+    NEW_SONGS_START_INDEX
+  );
+  songs.forEach((song) => {
+    if (!uniqueSimIds.includes(song.cursor)) {
+      uniqueSimIds.push(song.cursor);
+      uniqueSimSongs.push(song);
+    }
+
+    uniqueSimSongs.push(null);
+  });
+  console.log("SIMILAR SONGS", songs);
+  console.log("UNIQUE songs", uniqueSimSongs);
+
+  return uniqueSimSongs.slice(NEW_SONGS_START_INDEX);
 };
 
 // spotify api calls
@@ -131,7 +237,7 @@ const getAccessToken = async (refreshToken: string): Promise<string | null> => {
       "Content-Type": "application/x-www-form-urlencoded",
     },
   });
-  const data = await res.json();
+  const data = (await res.json()) as { access_token: string };
   return data.access_token;
 };
 
@@ -141,7 +247,7 @@ const getSpotifyTracksData = async (tracksId: string, refreshToken: string) => {
     `${env.SPOTIFY_API_ENDPOINT}/tracks?ids=${tracksId}`,
     {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken!}`,
         "Content-Type": "application/json",
       },
     }
@@ -166,10 +272,10 @@ const getSpotifySearchResults = async (
     offset: offset.toString(),
   });
   const res = await fetch(
-    `${env.SPOTIFY_API_ENDPOINT}/search?${query_params}`,
+    `${env.SPOTIFY_API_ENDPOINT}/search?${query_params.toString()}`,
     {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken!}`,
         "Content-Type": "application/json",
       },
     }
@@ -195,19 +301,8 @@ export const discoverRouter = createTRPCRouter({
         let songs: SongType[] = [];
 
         if (session) {
-          const recomSongsRes = await getAiRecomSongs(text, first);
-          const lastRecomSongs = recomSongsRes.slice(
-            recomSongsRes.length - DEFAULT_RESULTS_QTT
-          );
-          const ids = lastRecomSongs.reduce((prevSongId, crrSong) => {
-            if (crrSong !== null) {
-              return prevSongId === ""
-                ? `${crrSong.cursor}`
-                : `${prevSongId},${crrSong.cursor}`;
-            }
-
-            return `${prevSongId}`;
-          }, "");
+          const lastRecomSongs = await getAiRecomSongs(text, first);
+          const ids = getIdsString(lastRecomSongs as SongResult[]);
 
           const spotifyTracks = await getSpotifyTracksData(
             ids,
@@ -239,7 +334,7 @@ export const discoverRouter = createTRPCRouter({
           return songs;
         }
       }),
-    similar: publicProcedure
+    spotify: publicProcedure
       .input(
         z.object({
           trackName: z.string(),
@@ -257,7 +352,6 @@ export const discoverRouter = createTRPCRouter({
             session.accessToken
           )) as unknown as SpotifyApi.PagingObject<SpotifyApi.TrackObjectFull>;
 
-          console.log("TRACKS", tracks);
           return tracks.items.map((track) => {
             return {
               id: track.id,
@@ -272,6 +366,51 @@ export const discoverRouter = createTRPCRouter({
             };
           });
         }
+      }),
+    similar: publicProcedure
+      .input(
+        z.object({
+          trackId: z.string(),
+          first: z.number(),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        const { session } = ctx;
+        const { trackId, first } = input;
+        let songs: SongType[] = [];
+
+        if (session) {
+          const lastSimSongs = await getAiSimilarSongs(trackId, first);
+          const ids = getIdsString(lastSimSongs as SongResult[]);
+
+          const spotifyTracks = await getSpotifyTracksData(
+            ids,
+            session.accessToken
+          );
+          songs = spotifyTracks.map((track: SpotifyApi.TrackObjectFull) => {
+            const simSong = lastSimSongs.find(
+              (song) => song?.cursor === track.id
+            );
+
+            return {
+              id: simSong!.cursor,
+              genres: simSong!.node.audioAnalysisV6.result.genreTags,
+              moods: simSong!.node.audioAnalysisV6.result.moodTags,
+              instruments: simSong!.node.audioAnalysisV6.result.instrumentTags,
+              musicalEra: simSong!.node.audioAnalysisV6.result.musicalEraTag,
+              duration: track.duration_ms / 1000,
+              coverUrl:
+                track?.album?.images[0]?.url ||
+                track?.album?.images[1]?.url ||
+                "/defaultSongCover.jpeg",
+              previewUrl: track?.preview_url,
+              title: track.name,
+              artists: track.artists.map((artist) => artist.name),
+            };
+          });
+        }
+
+        return songs;
       }),
   }),
 });

@@ -16,6 +16,7 @@ import { formatSongDuration } from "@/utils/song-time";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { Button } from "@/components/ui/core/button";
 import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
+import type { SongType } from "@/server/api/routers/discover";
 
 const ItemSkeleton = () => {
   return (
@@ -37,7 +38,7 @@ const ItemSkeleton = () => {
     </div>
   );
 };
-const ListSkeleton = () => {
+export const ListSkeleton = () => {
   return (
     <SkeletonContainer>
       <div className="space-y-2">
@@ -125,7 +126,7 @@ const Discover = () => {
         ],
       });
     }
-  }, [recomSongs]);
+  }, [recomSongs, dispatch, songsList]);
 
   useEffect(() => {
     const main = document.getElementsByTagName("main");
@@ -134,16 +135,18 @@ const Discover = () => {
     if (isFetched) {
       setLoadingMore(false);
     }
-  }, [isFetching && loadingMore]);
+  }, [isFetched, isFetching, loadingMore]);
+  // ^ this dep array might break the default loading more songs behavior
 
   return (
     <Shell heading="Discover" subtitle="Find new songs with AI">
       <Input
         placeholder="I dont know what to listen. What do you recommend"
-        onChange={debounce(async (e) => {
-          const text = e.target.value;
+        onChange={debounce((e) => {
+          const { target } = e as Event & { target: HTMLInputElement };
+          const text = target.value;
           if (text.trim()) {
-            setSearchValue(text);
+            setSearchValue(text.trim());
             setResultsQtt(DEFAULT_RESULTS_QTT);
             setResultsPage(1);
             // const songs = await utils.searchAi.getSongs.fetch(text);
@@ -173,68 +176,7 @@ const Discover = () => {
           {(!isFetching || (isFetching && loadingMore)) && (
             <ul className="space-y-2 overflow-y-auto pb-2">
               {recomSongs.map((song, index) => (
-                <li
-                  key={index}
-                  onClick={(e) => {
-                    if (!e.target.closest("button")) {
-                      if (song.previewUrl) {
-                        dispatch({
-                          type: "SELECT_SONG",
-                          songPos: index,
-                        });
-                      } else {
-                        showToast("Cannot play. Sorry", "error");
-                      }
-                    }
-                  }}
-                  className={cn(
-                    "group flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4 hover:bg-slate-100 dark:hover:bg-slate-700",
-                    !song.previewUrl && "cursor-not-allowed opacity-40"
-                  )}
-                >
-                  <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
-                    <span className="flex w-4 flex-shrink-0  items-center justify-center font-semibold">
-                      {index + 1}
-                    </span>
-                    <div className="relative h-10 w-10 flex-shrink-0">
-                      <Image
-                        alt={`${song.title} playing`}
-                        fill
-                        placeholder="blur"
-                        blurDataURL={`data:image/svg+xml;base64,${toBase64(
-                          shimmer(700, 475)
-                        )}`}
-                        sizes="20vw"
-                        src={song.coverUrl || "/defaultSongCover.jpeg"}
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="overflow-hidden">
-                      <p className="truncate">{song.title}</p>
-                      <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-                        {song.artists[0]}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center">
-                      <ScanSimilarsBttn
-                        disabled={!song.previewUrl}
-                        index={index}
-                        className="opacity-0 group-hover:opacity-100"
-                      />
-                      <FavouriteBttn
-                        className="group opacity-0 group-hover:opacity-100"
-                        iconClassName="h-4 w-4"
-                        songPos={index}
-                        disabled={!song.previewUrl}
-                      />
-                    </div>
-                    <span className="flex w-[5ch] justify-end text-end text-sm tabular-nums text-slate-600 dark:text-slate-300">
-                      {formatSongDuration(song.duration)}
-                    </span>
-                  </div>
-                </li>
+                <TrackItem track={song} index={index} key={song.id} />
               ))}
             </ul>
           )}
@@ -261,6 +203,83 @@ const Discover = () => {
         />
       )}
     </Shell>
+  );
+};
+
+export const TrackItem = ({
+  index,
+  track,
+}: {
+  index: number;
+  track:
+    | SongType
+    | Omit<SongType, "genres" | "moods" | "instruments" | "musicalEra">;
+}) => {
+  const { dispatch } = useContext(MusicPlayerContext);
+
+  return (
+    <li
+      onClick={(e) => {
+        const target = e.target as HTMLLIElement;
+        if (!target.closest("button")) {
+          if (track.previewUrl) {
+            dispatch({
+              type: "SELECT_SONG",
+              songPos: index,
+            });
+          } else {
+            showToast("Cannot play. Sorry", "error");
+          }
+        }
+      }}
+      className={cn(
+        "group flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4 hover:bg-slate-100 dark:hover:bg-slate-700",
+        !track.previewUrl && "cursor-not-allowed opacity-40"
+      )}
+    >
+      <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
+        <span className="flex w-4 shrink-0  items-center justify-center font-semibold">
+          {index + 1}
+        </span>
+        <div className="relative h-10 w-10 shrink-0">
+          <Image
+            alt={`${track.title} playing`}
+            fill
+            placeholder="blur"
+            blurDataURL={`data:image/svg+xml;base64,${toBase64(
+              shimmer(700, 475)
+            )}`}
+            sizes="20vw"
+            src={track.coverUrl || "/defaultSongCover.jpeg"}
+            className="object-cover"
+          />
+        </div>
+        <div className="overflow-hidden">
+          <p className="truncate">{track.title}</p>
+          <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+            {track.artists[0]}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center space-x-4">
+        <div className="flex items-center">
+          <ScanSimilarsBttn
+            disabled={!track.previewUrl}
+            index={index}
+            className="opacity-0 group-hover:opacity-100"
+          />
+          <FavouriteBttn
+            className="group opacity-0 group-hover:opacity-100"
+            iconClassName="h-4 w-4"
+            songPos={index}
+            disabled={!track.previewUrl}
+          />
+        </div>
+        <span className="flex w-[5ch] justify-end text-end text-sm tabular-nums text-slate-600 dark:text-slate-300">
+          {formatSongDuration(track.duration)}
+        </span>
+      </div>
+    </li>
   );
 };
 

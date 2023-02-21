@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/core/button";
 import { Icons } from "@/components/ui/core/icons";
 import { getServerAuthSession } from "@/server/auth";
 import { WEBAPP_URL } from "@/utils/constants";
-import { GetServerSidePropsContext } from "next";
+import type { GetServerSidePropsContext } from "next";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
@@ -20,13 +20,13 @@ export default function Login() {
       setErrorMessage("Something went wrong. Please try again");
       // Clean URL to get rid of error query
       router
-        .push(`${WEBAPP_URL}/login`, undefined, { shallow: true })
+        .push(`${WEBAPP_URL!}/login`, undefined, { shallow: true })
         .catch(console.error);
     }
   }, [router, router.query?.error]);
 
   return (
-    <AuthContainer showLogo heading="Welcome to Dreamify">
+    <AuthContainer showLogo heading="Welcome to TuneAI">
       {errorMessage && oAuthError && (
         <Alert className="mt-4" severity="error" title={errorMessage} />
       )}
@@ -37,9 +37,9 @@ export default function Login() {
         <Button
           color="secondary"
           className="flex w-full justify-center"
-          onClick={async (e) => {
+          onClick={(e) => {
             e.preventDefault();
-            await signIn("spotify");
+            void signIn("spotify");
           }}
         >
           <Icons.spotify className="mr-2 inline-flex h-4 w-4 stroke-[1.5px]" />

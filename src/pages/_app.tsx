@@ -29,14 +29,8 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import {
-  PropsWithChildren,
-  useContext,
-  useEffect,
-  useReducer,
-  useRef,
-  useState,
-} from "react";
+import { useContext, useEffect, useReducer, useRef, useState } from "react";
+import type { PropsWithChildren } from "react";
 import { Toaster } from "react-hot-toast";
 import showToast from "@/components/ui/core/notifications";
 import { Slider } from "@/components/ui/core/slider";
@@ -281,8 +275,8 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
     }
     case "TOGGLE_FAVOURITE": {
       if (state.songsList) {
-        let newSongsList = state.songsList;
-        let newSongItem = newSongsList[action.songPos];
+        const newSongsList = state.songsList;
+        const newSongItem = newSongsList[action.songPos];
 
         if (newSongItem) {
           newSongsList[action.songPos] = {
@@ -300,8 +294,8 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
     }
     case "SET_SCANNING": {
       if (state.songsList) {
-        let newSongsList = state.songsList;
-        let newSongItem = newSongsList[action.index];
+        const newSongsList = state.songsList;
+        const newSongItem = newSongsList[action.index];
 
         if (newSongItem) {
           newSongsList[action.index] = {
@@ -448,20 +442,22 @@ const MusicPlayer = () => {
             dispatch({ type: "SET_TRACK_READY", ready: false });
           }}
           onLoadedData={(e) => {
+            const target = e.target as HTMLAudioElement;
             // console.log("ON LOADED DATA", e);
-            setDuration(e.target.duration);
-            setCrrSoundPerc(e.target.volume);
+            setDuration(target.duration);
+            setCrrSoundPerc(target.volume);
           }}
           onCanPlay={() => {
             // console.log("ON CANPLAY", e);
             dispatch({ type: "SET_TRACK_READY", ready: true });
             if (audioRef.current) {
-              audioRef.current.play();
+              void audioRef.current.play();
             }
             dispatch({ type: "TOGGLE_PLAY", playing: true });
           }}
           onTimeUpdate={(e) => {
-            const percentage = e.target.currentTime / duration;
+            const target = e.target as HTMLAudioElement;
+            const percentage = target.currentTime / duration!;
 
             setCrrSongPerc(percentage);
           }}
@@ -490,7 +486,8 @@ const MusicPlayer = () => {
                 "relative mx-2 flex cursor-pointer flex-col justify-center rounded-lg border border-gray-100 bg-gray-50 p-2 backdrop-blur-0 dark:border-transparent dark:bg-slate-700 md:hidden"
               )}
               onClick={(e) => {
-                if (!e.target.closest("button")) {
+                const target = e.target as HTMLDivElement;
+                if (!target.closest("button")) {
                   setPlayerOpen(true);
                 }
               }}
@@ -685,7 +682,7 @@ const MusicPlayer = () => {
                     src={crrPlayingSong.coverUrl || "/defaultSongCover.jpeg"}
                     alt={`${crrPlayingSong.title} playing`}
                     fill
-                    className="flex-shrink-0 rounded-md object-cover"
+                    className="shrink-0 rounded-md object-cover"
                   />
                 </div>
               )}
@@ -796,7 +793,7 @@ const MusicPlayer = () => {
                   }}
                 >
                   {(() => {
-                    let SoundIcon =
+                    const SoundIcon =
                       crrSoundPerc <= MIN_VOL_TO_MUTE
                         ? VolumeX
                         : crrSoundPerc > MIN_VOL_TO_MUTE && crrSoundPerc < 0.75
@@ -998,7 +995,7 @@ const PlayBttn = ({
       onClick={() => {
         if (audioRef.current) {
           if (trackReady && !playing) {
-            audioRef.current.play();
+            void audioRef.current.play();
           } else {
             audioRef.current.pause();
           }
