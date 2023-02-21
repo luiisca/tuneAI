@@ -22,10 +22,10 @@ export default function AuthContainer(props: React.PropsWithChildren<Props>) {
       {props.showLogo && (
         <Image
           src={LOGO}
-          alt="Dreamify Logo"
+          alt="TuneAI Logo"
           height={78}
           width={256}
-          className="min-w-40 mx-auto mb-auto h-auto w-1/12 dark:invert"
+          className="mx-auto mb-auto h-auto w-1/12 min-w-[10rem] dark:invert"
         />
       )}
       <div

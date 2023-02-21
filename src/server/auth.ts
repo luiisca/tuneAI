@@ -1,18 +1,10 @@
 import type { GetServerSidePropsContext } from "next";
-import {
-  Account,
-  Awaitable,
-  CallbacksOptions,
-  getServerSession,
-  Profile,
-} from "next-auth";
+import { getServerSession, Profile } from "next-auth";
 import type { NextAuthOptions, DefaultSession } from "next-auth";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { env } from "../env/server.mjs";
 import { prisma } from "./db";
 import SpotifyProvider from "next-auth/providers/spotify";
-import { WEBAPP_URL } from "@/utils/constants";
-import { JWT } from "next-auth/jwt/types.js";
 
 /**
  * Module augmentation for `next-auth` types.
@@ -50,7 +42,7 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user, account, profile }) {
+    jwt({ token, user, account, profile }) {
       if (user) {
         token.id = user.id;
       }
@@ -69,7 +61,7 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    async session({ session, token }) {
+    session({ session, token }) {
       if (session && token) {
         session.user.id = token.id as string;
       }
@@ -95,6 +87,7 @@ export const authOptions: NextAuthOptions = {
      * @see https://next-auth.js.org/providers/github
      **/
   ],
+  debug: true,
 };
 
 /**

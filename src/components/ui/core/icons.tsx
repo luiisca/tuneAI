@@ -1,19 +1,11 @@
-import {
-  LucideProps,
-  Music,
-  Twitter,
-  type Icon as LucideIcon,
-} from "lucide-react";
+import { Music, Twitter, type Icon as LucideIcon } from "lucide-react";
+import type { LucideProps } from "lucide-react";
 
 export type Icon = LucideIcon;
 
 export const Icons = {
   twitter: Twitter,
-  logo: ({
-    icon,
-    small,
-    ...props
-  }: LucideProps & { icon?: boolean; small?: boolean }) => (
+  logo: ({ icon, ...props }: LucideProps & { icon?: boolean }) => (
     <h1 className="flex items-center justify-center space-x-2 text-2xl font-semibold tracking-tight">
       <Music {...props} className="h-6 w-auto" />
       {!icon && <span>Music</span>}

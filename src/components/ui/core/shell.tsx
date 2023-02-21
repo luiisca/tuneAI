@@ -36,7 +36,7 @@ const useRedirectToLoginIfUnauthenticated = () => {
 
   useEffect(() => {
     if (!loading && !session) {
-      router.replace({
+      void router.replace({
         pathname: "/login",
       });
     }
@@ -138,7 +138,7 @@ function UserDropdown({ small }: { small?: boolean }) {
             <span
               className={cn(
                 small ? "h-8 w-8" : "mr-2 h-9 w-9",
-                "relative flex-shrink-0 rounded-full"
+                "relative shrink-0 rounded-full"
               )}
             >
               {
@@ -152,11 +152,12 @@ function UserDropdown({ small }: { small?: boolean }) {
             </span>
             {/*Text*/}
             {!small && (
-              <span className="flex flex-grow items-center truncate">
-                <span className="flex-grow truncate text-sm">
+              <span className="flex grow items-center truncate">
+                <span className="grow truncate text-sm">
                   <a
                     href={user.profileSrc}
                     target="_blank"
+                    rel="noreferrer"
                     className="block w-fit truncate font-medium hover:underline hover:underline-offset-2"
                   >
                     {user.name || "Nameless User"}
@@ -166,7 +167,7 @@ function UserDropdown({ small }: { small?: boolean }) {
                   </span>
                 </span>
                 <MoreVertical
-                  className="h-4 w-4 flex-shrink-0 text-slate-400 group-hover:text-slate-500 dark:group-hover:text-slate-400"
+                  className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-slate-500 dark:group-hover:text-slate-400"
                   aria-hidden="true"
                 />
               </span>
@@ -178,11 +179,11 @@ function UserDropdown({ small }: { small?: boolean }) {
           className="rounded-lg"
         >
           <DropdownMenuItem
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={() => void signOut({ callbackUrl: "/login" })}
             className="disable-focus-visible group flex cursor-pointer items-center rounded-md px-4 py-2"
           >
             <LogOut
-              className={cn("mr-2 h-4 w-4 flex-shrink-0")}
+              className={cn("mr-2 h-4 w-4 shrink-0")}
               aria-hidden="true"
             />
             Log out
@@ -254,7 +255,7 @@ const NavigationItem: React.FC<{ item: NavigationItemType }> = ({ item }) => {
     >
       {item.icon && (
         <item.icon
-          className={cn("h-4 w-4 flex-shrink-0", current && "text-inherit")}
+          className={cn("h-4 w-4 shrink-0", current && "text-inherit")}
           aria-hidden="true"
           aria-current={current ? "page" : undefined}
         />
@@ -298,7 +299,7 @@ const MobileNavigationItem: React.FC<{
       key={item.name}
       href={item.href}
       className={cn(
-        "relative my-2 min-w-0 flex-1 overflow-hidden rounded-md py-2 px-1 text-center text-xs font-medium text-gray-400 hover:bg-gray-200 hover:text-gray-700 focus:z-10 sm:text-sm",
+        "relative my-2 min-w-0 flex-1 overflow-hidden rounded-md py-2 px-1 text-center text-xs font-medium text-gray-400 focus:z-10 hover:bg-gray-200 hover:text-gray-700 sm:text-sm",
         "[&[aria-current='page']]:text-gray-900 dark:[&[aria-current='page']]:text-slate-50"
       )}
       aria-current={current ? "page" : undefined}
@@ -306,7 +307,7 @@ const MobileNavigationItem: React.FC<{
       {item.icon && (
         <item.icon
           className={cn(
-            "mx-auto mb-1 block h-5 w-5 flex-shrink-0 text-center text-inherit [&[aria-current='page']]:text-gray-900",
+            "mx-auto mb-1 block h-5 w-5 shrink-0 text-center text-inherit [&[aria-current='page']]:text-gray-900",
             "dark:[&[aria-current='page']]:text-slate-50"
           )}
           aria-hidden="true"
@@ -322,7 +323,7 @@ function SideBar() {
   return (
     <aside
       className={cn(
-        "relative hidden w-14 flex-col border-r md:flex lg:w-56 lg:flex-shrink-0 lg:px-4",
+        "relative hidden w-14 flex-col border-r md:flex lg:w-56 lg:shrink-0 lg:px-4",
         "border-r-gray-100 bg-gray-50 dark:border-r-slate-700 dark:bg-slate-900"
       )}
     >
@@ -336,7 +337,7 @@ function SideBar() {
 
         {/* logo icon for tablet */}
         <Link href="/discover" className="text-center md:inline lg:hidden">
-          <Icons.logo small icon />
+          <Icons.logo icon />
         </Link>
 
         <Navigation />
@@ -391,7 +392,7 @@ export function ShellMain(props: LayoutProps) {
                 className={cn(
                   props.backPath ? "relative" : "fixed",
                   props.CTA && "cta",
-                  "relative bottom-auto right-auto mb-4 flex-shrink-0"
+                  "relative bottom-auto right-auto mb-4 shrink-0"
                 )}
               >
                 {props.CTA}
@@ -473,7 +474,7 @@ function TopNav() {
           <Icons.logo />
         </Link>
         <div className="flex items-center gap-2 self-center">
-          <ThemeToggle className="flex-shrink-0 md:hidden" />
+          <ThemeToggle className="shrink-0 md:hidden" />
           {/* <UserDropdown small /> */}
         </div>
       </nav>

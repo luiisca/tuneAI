@@ -1,5 +1,5 @@
 import { getServerAuthSession } from "@/server/auth";
-import { GetServerSidePropsContext } from "next";
+import type { GetServerSidePropsContext } from "next";
 
 function RedirectPage() {
   return;
