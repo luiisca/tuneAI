@@ -43,8 +43,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           trackId: data.resource.id,
         })}\n\n`
       );
-      res.end();
     }
+    res.status(200).json({
+      message: "Webhook completed",
+    });
+    res.end();
   } else {
     res.status(405).json({
       message: "Method not allowed",

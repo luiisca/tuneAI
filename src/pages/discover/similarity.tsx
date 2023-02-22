@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/core/input";
 // import { MusicPlayerContext } from "../_app";
 import { ListSkeleton, TrackItem } from "./ai";
 import { CyaniteEvent } from "../api/cyanite-webhook";
+import showToast from "@/components/ui/core/notifications";
 
 // const MenuListCustomComponent = <
 //   Option,
@@ -104,10 +105,22 @@ const Similar = () => {
     const eventSource = new EventSource("/api/cyanite-webhook");
 
     eventSource.addEventListener("message", (event: Event) => {
-      const messageEvent = event as MessageEvent<CyaniteEvent>;
+      const messageEvent = event as MessageEvent<string>;
 
+      const { status, trackId } = JSON.parse(messageEvent.data) as {
+        status: "finished" | "failed";
+        trackId: string;
+      };
+      showToast(`event: ${messageEvent as unknown as string}`, "success");
+      showToast(`event: ${messageEvent.data}`, "success");
       console.log("SENT EVENT", event);
       console.log("MESSAGE event", messageEvent);
+      console.log("STATUS", status);
+      console.log("TRACKID", trackId);
+      if (status === "finished") {
+        console.log("STARTING NEW SEARCH");
+        setSelectedSongId(trackId);
+      }
     });
 
     return () => {
@@ -160,8 +173,8 @@ const Similar = () => {
     data: simTracks,
     // isFetching: simIsFetching,
     // isFetched: simIsFetched,
-    // isError: simIsError,
-    // error: simError,
+    isError: simIsError,
+    error: simError,
   } = api.discover.getSongs.similar.useQuery(
     {
       trackId: selectedSongId as string,
@@ -244,6 +257,7 @@ const Similar = () => {
         </SelectContent>
       </Select>
 
+      {simIsError && simError && <span>{simError.message}</span>}
       {/* similar songs */}
       {simTracks?.map((track, index) => (
         <TrackItem index={index} track={track} key={track.id} />

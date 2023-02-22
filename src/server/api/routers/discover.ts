@@ -1,5 +1,6 @@
 import { env } from "@/env/server.mjs";
 import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
@@ -71,6 +72,19 @@ query SimilarTracksQuery($trackId: ID!, $first: Int!) {
   }
 }
 `;
+const spotifyTrackAnalysisEnqueueQueryDocument = `
+mutation SpotifyTrackEnqueueMutation($input: SpotifyTrackEnqueueInput!) {
+  spotifyTrackEnqueue(input: $input) {
+    ... on SpotifyTrackEnqueueSuccess {
+      enqueuedSpotifyTrack {
+        id
+      }
+    }
+    ... on Error {
+      message
+    }
+  }
+}`;
 
 type SongResult = {
   cursor: string;
@@ -98,8 +112,23 @@ interface SearchSimilarSongsResult {
     spotifyTrack: {
       id: string;
       title: string;
-      similarTracks: {
-        edges: SongResult[];
+      similarTracks:
+        | {
+            edges: SongResult[];
+          }
+        | {
+            code: string;
+            message: string;
+          };
+    };
+  };
+}
+
+interface enqueuedSpotifyTrack {
+  data: {
+    spotifyTrackEnqueue: {
+      enqueuedSpotifyTrack: {
+        id: string;
       };
     };
   };
@@ -199,27 +228,49 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
       "Content-Type": "application/json",
     },
   });
-  const songsResult = (await res.json()) as SearchSimilarSongsResult;
+  const songsResponse = (await res.json()) as SearchSimilarSongsResult;
 
   const NEW_SONGS_START_INDEX =
     first === DEFAULT_RESULTS_QTT ? 0 : first - DEFAULT_RESULTS_QTT;
-  console.log("SONGS RESULT", songsResult.data.spotifyTrack.similarTracks);
-  console.log("EDGES", songsResult.data.spotifyTrack.similarTracks.edges);
-  const songs = songsResult.data.spotifyTrack.similarTracks.edges.slice(
-    NEW_SONGS_START_INDEX
-  );
-  songs.forEach((song) => {
-    if (!uniqueSimIds.includes(song.cursor)) {
-      uniqueSimIds.push(song.cursor);
-      uniqueSimSongs.push(song);
-    }
+  const similarTracksResult = songsResponse.data.spotifyTrack.similarTracks;
+  if ("edges" in similarTracksResult) {
+    const songs = similarTracksResult.edges.slice(NEW_SONGS_START_INDEX);
+    songs.forEach((song) => {
+      if (!uniqueSimIds.includes(song.cursor)) {
+        uniqueSimIds.push(song.cursor);
+        uniqueSimSongs.push(song);
+      }
 
-    uniqueSimSongs.push(null);
+      uniqueSimSongs.push(null);
+    });
+    console.log("SIMILAR SONGS", songs);
+    console.log("UNIQUE songs", uniqueSimSongs);
+
+    return uniqueSimSongs.slice(NEW_SONGS_START_INDEX);
+  }
+
+  return similarTracksResult;
+};
+
+const enqueueSpotifyTrackAnalysis = async (trackID: string) => {
+  const res = await fetch(env.API_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      query: spotifyTrackAnalysisEnqueueQueryDocument,
+      variables: {
+        input: {
+          spotifyTrackId: trackID,
+        },
+      },
+    }),
+    headers: {
+      Authorization: `Bearer ${env.ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
   });
-  console.log("SIMILAR SONGS", songs);
-  console.log("UNIQUE songs", uniqueSimSongs);
+  const enqueuedSpotifyTrack = (await res.json()) as enqueuedSpotifyTrack;
 
-  return uniqueSimSongs.slice(NEW_SONGS_START_INDEX);
+  return enqueuedSpotifyTrack.data.spotifyTrackEnqueue.enqueuedSpotifyTrack.id;
 };
 
 // spotify api calls
@@ -381,6 +432,15 @@ export const discoverRouter = createTRPCRouter({
 
         if (session) {
           const lastSimSongs = await getAiSimilarSongs(trackId, first);
+          if ("code" in lastSimSongs || "message" in lastSimSongs) {
+            // song not analyzed yet
+            await enqueueSpotifyTrackAnalysis(trackId);
+
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Analyzing track...",
+            });
+          }
           const ids = getIdsString(lastSimSongs as SongResult[]);
 
           const spotifyTracks = await getSpotifyTracksData(
