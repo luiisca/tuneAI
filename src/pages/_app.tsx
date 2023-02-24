@@ -503,7 +503,7 @@ const MusicPlayer = () => {
                   />
                 </div>
                 {/* Text */}
-                <div className="dark:slate-50 w-full text-sm">
+                <div className="dark:slate-50 w-[calc(100%-8rem)] text-sm">
                   <p className="truncate font-bold">{crrPlayingSong.title}</p>
                   <p className="truncate font-normal">
                     {crrPlayingSong.artists[0]}
@@ -588,7 +588,7 @@ const MusicPlayer = () => {
             {/* title and favourite */}
             {crrPlayingSong && (
               <div className="mx-3 mb-4 flex items-center">
-                <div className="w-full">
+                <div className="w-full overflow-hidden">
                   {scanning ? (
                     <div className="flex flex-col space-y-1">
                       <SkeletonText className="w-1/2 text-xl" />
@@ -674,7 +674,7 @@ const MusicPlayer = () => {
 
           {/* DESKTOP PLAYER */}
           <div className="hidden h-24 border-t border-t-gray-100 bg-gray-50 p-4 dark:border-t-slate-700 dark:bg-slate-900 md:flex">
-            <div className="flex w-full items-center justify-start">
+            <div className="flex w-full items-center justify-start overflow-hidden">
               {/* track cover */}
               {crrPlayingSong && (
                 <div className="relative h-14 w-14 shrink-0">
@@ -689,7 +689,7 @@ const MusicPlayer = () => {
 
               {/* Text */}
               {crrPlayingSong && (
-                <div className="dark:slate-50 mx-3.5 text-sm ">
+                <div className="dark:slate-50 mx-3.5 w-1/2 text-sm">
                   <p className="truncate">{crrPlayingSong.title}</p>
                   <p className="truncate text-[0.6875rem] text-slate-500 dark:text-slate-400">
                     {crrPlayingSong.artists[0]}
