@@ -13,7 +13,6 @@ import {
 import { Input } from "@/components/ui/core/input";
 // import { MusicPlayerContext } from "../_app";
 import { ListSkeleton, TrackItem } from "./ai";
-import { CyaniteEvent } from "../api/cyanite-webhook";
 import showToast from "@/components/ui/core/notifications";
 
 // const MenuListCustomComponent = <

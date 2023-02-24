@@ -46,7 +46,7 @@ import { Button } from "@/components/ui/core/button";
 import { DEFAULT_SOUND, MIN_VOL_TO_MUTE } from "@/utils/constants";
 import { Progress } from "@/components/ui/progress";
 import { convertToSeconds, formatSongDuration } from "@/utils/song-time";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+// import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -855,10 +855,19 @@ const PlaybackControls = ({ className }: { className?: string }) => {
     state: { songsList, crrPlayingSong, loop, trackReady },
     dispatch,
   } = useContext(MusicPlayerContext);
+  const prevInvalidFirst =
+    crrPlayingSong && songsList
+      ? crrPlayingSong.position - 1 === 0 && !songsList[0]?.audioSrc
+      : false;
   const firstSong = crrPlayingSong ? crrPlayingSong.position === 0 : false;
   const lastSong =
-    crrPlayingSong && songsList?.length
+    crrPlayingSong && songsList
       ? songsList.length - 1 === crrPlayingSong.position
+      : false;
+  const nextInvalidLast =
+    crrPlayingSong && songsList
+      ? crrPlayingSong.position + 1 === songsList.length - 1 &&
+        !songsList[songsList.length - 1]?.audioSrc
       : false;
   const scanning = crrPlayingSong?.scanning;
 
@@ -880,11 +889,12 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       <button
         className={cn(
           "group p-3 md:p-2",
-          (scanning || firstSong) && "cursor-not-allowed text-slate-400"
+          (scanning || firstSong || prevInvalidFirst) &&
+            "cursor-not-allowed text-slate-400"
         )}
-        disabled={scanning || firstSong}
+        disabled={scanning || firstSong || prevInvalidFirst}
         onClick={() => {
-          if (crrPlayingSong && !firstSong) {
+          if (crrPlayingSong && !firstSong && !prevInvalidFirst) {
             dispatch({
               type: "SELECT_SONG",
               position: "prev",
@@ -898,8 +908,10 @@ const PlaybackControls = ({ className }: { className?: string }) => {
             "h-8 w-8 fill-current md:h-4 md:w-4",
             !scanning &&
               !firstSong &&
+              !prevInvalidFirst &&
               "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            (scanning || firstSong) && "fill-slate-400 md:text-slate-400"
+            (scanning || firstSong || prevInvalidFirst) &&
+              "fill-slate-400 md:text-slate-400"
           )}
         />
       </button>
@@ -927,11 +939,12 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       <button
         className={cn(
           "group p-3 md:p-2",
-          (scanning || lastSong) && "cursor-not-allowed text-slate-400"
+          (scanning || lastSong || nextInvalidLast) &&
+            "cursor-not-allowed text-slate-400"
         )}
-        disabled={scanning || lastSong}
+        disabled={scanning || lastSong || nextInvalidLast}
         onClick={() => {
-          if (crrPlayingSong && !lastSong) {
+          if (crrPlayingSong && !lastSong && !nextInvalidLast) {
             dispatch({
               type: "SELECT_SONG",
               position: "next",
@@ -945,8 +958,10 @@ const PlaybackControls = ({ className }: { className?: string }) => {
             "h-8 w-8 fill-current md:h-4 md:w-4",
             !scanning &&
               !lastSong &&
+              !nextInvalidLast &&
               "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            (scanning || lastSong) && "fill-slate-400 md:text-slate-400"
+            (scanning || lastSong || nextInvalidLast) &&
+              "fill-slate-400 md:text-slate-400"
           )}
         />
       </button>

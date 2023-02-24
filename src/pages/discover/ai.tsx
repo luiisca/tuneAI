@@ -57,7 +57,6 @@ const Discover = () => {
   const [resultsPage, setResultsPage] = useState(1);
   const [resultsQtt, setResultsQtt] = useState(DEFAULT_RESULTS_QTT);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [latestTracks, setLatestTracks] = useState<[] | SongType[]>([]);
   const utils = api.useContext();
   const reset = useCallback(() => {
     setResultsPage(1);
@@ -84,11 +83,20 @@ const Discover = () => {
       refetchOnReconnect: false,
       refetchOnMount: false,
       onSuccess: (data) => {
-        if (data) {
-          setLatestTracks(data);
-        }
         console.log("procedure DATA", data);
         console.log("resutlsQTT", resultsQtt);
+        const formatTracksForSongsList = (tracks: SongType[]) => {
+          return tracks.map((track, index: number) => ({
+            position: (songsList?.length || 0) + index,
+            id: track.id,
+            title: track.title,
+            artists: track.artists,
+            scanning: false,
+            coverUrl: track.coverUrl,
+            favourite: false, // @TODO: get them from spotify
+            audioSrc: track.previewUrl || "",
+          }));
+        };
         const prevData = utils.discover.getSongs.ai.getData({
           text: searchValue,
           first: resultsQtt - DEFAULT_RESULTS_QTT,
@@ -100,45 +108,34 @@ const Discover = () => {
             first: resultsQtt,
           },
           (oldData) => {
-            if (resultsQtt === DEFAULT_RESULTS_QTT) {
+            if (resultsQtt === DEFAULT_RESULTS_QTT && data) {
+              dispatch({
+                type: "SAVE_SONGS",
+                songs: [...formatTracksForSongsList(data)],
+              });
               return data;
             }
             if (prevData && oldData) {
+              dispatch({
+                type: "SAVE_SONGS",
+                songs: [...songsList!, ...formatTracksForSongsList(oldData)],
+              });
+
               return [...prevData, ...oldData];
             }
 
-            return oldData;
+            if (oldData) {
+              dispatch({
+                type: "SAVE_SONGS",
+                songs: [...formatTracksForSongsList(oldData)],
+              });
+              return oldData;
+            }
           }
         );
       },
     }
   );
-
-  useEffect(() => {
-    if (recomSongs) {
-      console.log("SONGSLIST", songsList);
-      console.log("recomSongs".toUpperCase(), recomSongs);
-
-      const latestTracksFormatted = latestTracks.map((track, index) => ({
-        position: (songsList?.length || 0) + index,
-        id: track.id,
-        title: track.title,
-        artists: track.artists,
-        scanning: false,
-        coverUrl: track.coverUrl,
-        favourite: false, // @TODO: get them from spotify
-        audioSrc: track.previewUrl || "",
-      }));
-      dispatch({
-        type: "SAVE_SONGS",
-        songs:
-          // only save latest tracks if search resetted
-          resultsQtt === DEFAULT_RESULTS_QTT
-            ? [...latestTracksFormatted]
-            : [...(songsList || []), ...latestTracksFormatted],
-      });
-    }
-  }, [latestTracks, dispatch]);
 
   useEffect(() => {
     const main = document.getElementsByTagName("main");
@@ -201,6 +198,7 @@ const Discover = () => {
                 setResultsQtt((resultsPage + 1) * DEFAULT_RESULTS_QTT);
                 setLoadingMore(true);
               }}
+              disabled={isFetching && loadingMore}
             >
               Show more
             </Button>
