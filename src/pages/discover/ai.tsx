@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/core/input";
 import Shell from "@/components/ui/core/shell";
 import { api } from "@/utils/api";
 import { debounce } from "lodash";
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import { CircleSlashed, Music2 } from "lucide-react";
@@ -57,7 +57,12 @@ const Discover = () => {
   const [resultsPage, setResultsPage] = useState(1);
   const [resultsQtt, setResultsQtt] = useState(DEFAULT_RESULTS_QTT);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [latestTracks, setLatestTracks] = useState<[] | SongType[]>([]);
   const utils = api.useContext();
+  const reset = useCallback(() => {
+    setResultsPage(1);
+    setResultsQtt(DEFAULT_RESULTS_QTT);
+  }, []);
 
   const {
     state: { songsList },
@@ -71,14 +76,19 @@ const Discover = () => {
     isError,
     error,
   } = api.discover.getSongs.ai.useQuery(
-    { text: searchValue, first: resultsQtt },
+    { text: searchValue.trim(), first: resultsQtt },
     {
       enabled: !!searchValue.trim() && !!resultsQtt,
       keepPreviousData: true,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
-      onSuccess: () => {
+      onSuccess: (data) => {
+        if (data) {
+          setLatestTracks(data);
+        }
+        console.log("procedure DATA", data);
+        console.log("resutlsQTT", resultsQtt);
         const prevData = utils.discover.getSongs.ai.getData({
           text: searchValue,
           first: resultsQtt - DEFAULT_RESULTS_QTT,
@@ -90,6 +100,9 @@ const Discover = () => {
             first: resultsQtt,
           },
           (oldData) => {
+            if (resultsQtt === DEFAULT_RESULTS_QTT) {
+              return data;
+            }
             if (prevData && oldData) {
               return [...prevData, ...oldData];
             }
@@ -105,28 +118,27 @@ const Discover = () => {
     if (recomSongs) {
       console.log("SONGSLIST", songsList);
       console.log("recomSongs".toUpperCase(), recomSongs);
-      const newSongs = recomSongs.slice(
-        recomSongs.length - DEFAULT_RESULTS_QTT
-      );
 
+      const latestTracksFormatted = latestTracks.map((track, index) => ({
+        position: (songsList?.length || 0) + index,
+        id: track.id,
+        title: track.title,
+        artists: track.artists,
+        scanning: false,
+        coverUrl: track.coverUrl,
+        favourite: false, // @TODO: get them from spotify
+        audioSrc: track.previewUrl || "",
+      }));
       dispatch({
         type: "SAVE_SONGS",
-        songs: [
-          ...(songsList || []),
-          ...newSongs.map((song, index) => ({
-            position: index,
-            id: song.id,
-            title: song.title,
-            artists: song.artists,
-            scanning: false,
-            coverUrl: song.coverUrl,
-            favourite: false, // @TODO: get them from spotify
-            audioSrc: song.previewUrl || "",
-          })),
-        ],
+        songs:
+          // only save latest tracks if search resetted
+          resultsQtt === DEFAULT_RESULTS_QTT
+            ? [...latestTracksFormatted]
+            : [...(songsList || []), ...latestTracksFormatted],
       });
     }
-  }, [recomSongs, dispatch, songsList]);
+  }, [latestTracks, dispatch]);
 
   useEffect(() => {
     const main = document.getElementsByTagName("main");
@@ -146,9 +158,9 @@ const Discover = () => {
           const { target } = e as Event & { target: HTMLInputElement };
           const text = target.value;
           if (text.trim()) {
+            console.log("text trimmed", text.trim());
             setSearchValue(text.trim());
-            setResultsQtt(DEFAULT_RESULTS_QTT);
-            setResultsPage(1);
+            reset();
             // const songs = await utils.searchAi.getSongs.fetch(text);
           }
         }, 800)}

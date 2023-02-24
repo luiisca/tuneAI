@@ -126,11 +126,15 @@ interface SearchSimilarSongsResult {
 
 interface enqueuedSpotifyTrack {
   data: {
-    spotifyTrackEnqueue: {
-      enqueuedSpotifyTrack: {
-        id: string;
-      };
-    };
+    spotifyTrackEnqueue:
+      | {
+          enqueuedSpotifyTrack: {
+            id: string;
+          };
+        }
+      | {
+          message: string;
+        };
   };
 }
 
@@ -147,22 +151,16 @@ export type SongType = {
   musicalEra: string;
 };
 
-const getIdsString = (songs: SongResult[]) => {
+const getIdsString = (songs: (SongResult | null)[]) => {
   const ids = songs.reduce((prevSongId, crrSong) => {
-    if (crrSong !== null) {
-      return prevSongId === ""
-        ? `${crrSong.cursor}`
-        : `${prevSongId},${crrSong.cursor}`;
-    }
-
-    return `${prevSongId}`;
+    return crrSong ? `${prevSongId},${crrSong.cursor}` : `${prevSongId}`;
   }, "");
-  return ids;
+  return ids.slice(1);
 };
 
 // cianity api calls
-const uniqueRecomIds: string[] = [];
-const uniqueRecomSongs: (SongResult | null)[] = [];
+let uniqueRecomIds: string[] = [];
+let uniqueRecomSongs: (SongResult | null)[] = [];
 
 const getAiRecomSongs = async (text: string, first: number) => {
   const res = await fetch(env.API_URL, {
@@ -183,35 +181,41 @@ const getAiRecomSongs = async (text: string, first: number) => {
 
   const NEW_SONGS_START_INDEX =
     first === DEFAULT_RESULTS_QTT ? 0 : first - DEFAULT_RESULTS_QTT;
-  const songs = songsResult.data.freeTextSearch.edges.slice(
+  const latestTracks = songsResult.data.freeTextSearch.edges.slice(
     NEW_SONGS_START_INDEX
   );
-  songs.forEach((song) => {
-    if (!uniqueRecomIds.includes(song.cursor)) {
-      uniqueRecomIds.push(song.cursor);
-      uniqueRecomSongs.push(song);
+  console.log("FIRST", first);
+  console.log("EDGES", songsResult.data.freeTextSearch.edges);
+  console.log("UNIQUE TRACKS before", uniqueRecomIds);
+  console.log("LATEST TRACKS", latestTracks);
+
+  if (first === DEFAULT_RESULTS_QTT) {
+    uniqueRecomIds = [];
+    uniqueRecomSongs = [];
+  }
+
+  latestTracks.forEach((track) => {
+    if (!uniqueRecomIds.includes(track.cursor)) {
+      uniqueRecomIds.push(track.cursor);
+      uniqueRecomSongs.push(track);
+
+      return;
     }
 
     uniqueRecomSongs.push(null);
   });
+  console.log("UNIQUE TRACKS AFTER", uniqueRecomIds);
+  console.log("UNIQUE RECOM songs", uniqueRecomSongs);
+  console.log(
+    "SLICED UNIQUERECOm songs",
+    uniqueRecomSongs.slice(NEW_SONGS_START_INDEX)
+  );
 
   return uniqueRecomSongs.slice(NEW_SONGS_START_INDEX);
 };
 
 const uniqueSimIds: string[] = [];
-const uniqueSimSongs: ({
-  cursor: string;
-  node: {
-    audioAnalysisV6: {
-      result: {
-        genreTags: string[];
-        moodTags: string[];
-        instrumentTags: string[];
-        musicalEraTag: string;
-      };
-    };
-  };
-} | null)[] = [];
+const uniqueSimSongs: (SongResult | null)[] = [];
 
 const getAiSimilarSongs = async (trackId: string, first: number) => {
   const res = await fetch(env.API_URL, {
@@ -243,8 +247,8 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
 
       uniqueSimSongs.push(null);
     });
-    console.log("SIMILAR SONGS", songs);
-    console.log("UNIQUE songs", uniqueSimSongs);
+    // console.log("SIMILAR SONGS", songs);
+    // console.log("UNIQUE songs", uniqueSimSongs);
 
     return uniqueSimSongs.slice(NEW_SONGS_START_INDEX);
   }
@@ -270,7 +274,16 @@ const enqueueSpotifyTrackAnalysis = async (trackID: string) => {
   });
   const enqueuedSpotifyTrack = (await res.json()) as enqueuedSpotifyTrack;
 
-  return enqueuedSpotifyTrack.data.spotifyTrackEnqueue.enqueuedSpotifyTrack.id;
+  const enqueuedSpotifyTrackResult =
+    enqueuedSpotifyTrack.data.spotifyTrackEnqueue;
+  if ("message" in enqueuedSpotifyTrackResult) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: enqueuedSpotifyTrackResult.message,
+    });
+  }
+
+  return enqueuedSpotifyTrackResult.enqueuedSpotifyTrack.id;
 };
 
 // spotify api calls
@@ -303,9 +316,8 @@ const getSpotifyTracksData = async (tracksId: string, refreshToken: string) => {
       },
     }
   );
-  console.log("res spotify", res.headers);
   const data = (await res.json()) as SpotifyApi.MultipleTracksResponse;
-  console.log("spotify data", data);
+  // console.log("spotify data", data);
 
   return data.tracks;
 };
@@ -353,12 +365,14 @@ export const discoverRouter = createTRPCRouter({
 
         if (session) {
           const lastRecomSongs = await getAiRecomSongs(text, first);
-          const ids = getIdsString(lastRecomSongs as SongResult[]);
+          const ids = getIdsString(lastRecomSongs);
+          console.log("IDS", ids);
 
           const spotifyTracks = await getSpotifyTracksData(
             ids,
             session.accessToken
           );
+          console.log("SPOTIFY tracks", spotifyTracks);
           songs = spotifyTracks.map((track: SpotifyApi.TrackObjectFull) => {
             const recomSong = lastRecomSongs.find(
               (song) => song?.cursor === track.id
@@ -441,7 +455,7 @@ export const discoverRouter = createTRPCRouter({
               message: "Analyzing track...",
             });
           }
-          const ids = getIdsString(lastSimSongs as SongResult[]);
+          const ids = getIdsString(lastSimSongs);
 
           const spotifyTracks = await getSpotifyTracksData(
             ids,
