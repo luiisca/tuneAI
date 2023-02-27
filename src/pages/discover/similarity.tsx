@@ -34,6 +34,7 @@ import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { formatSongDuration } from "@/utils/song-time";
 import { cn } from "@/utils/cn";
 import showToast from "@/components/ui/core/notifications";
+import { SkeletonContainer, SkeletonText } from "@/components/ui/skeleton";
 
 type InitialStateType = {
   searchValue: string;
@@ -146,6 +147,25 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
       return state;
     }
   }
+};
+
+const ItemSkeleton = () => {
+  return (
+    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 pl-8 pr-2 dark:bg-slate-900 md:pr-4">
+      <div className="flex h-full w-full items-center space-x-4 ">
+        {/* image */}
+        <SkeletonText className="h-10 w-10 shrink-0" />
+        <div className="flex w-full flex-col justify-center space-y-1">
+          {/* title */}
+          <SkeletonText className="h-5 w-1/3" />
+          {/* artist */}
+          <SkeletonText className="h-4 w-1/4 text-sm" />
+        </div>
+      </div>
+      {/* time */}
+      <SkeletonText className="my-auto h-1/3 w-[4ch]" />
+    </div>
+  );
 };
 
 const Similar = () => {
@@ -335,7 +355,7 @@ const SpotifySearchList = ({
         Loading
       </SelectItem>
       <div>
-        {isFetching && !loadingMore && <ListSkeleton />}
+        {isFetching && !loadingMore && <ListSkeleton Item={ItemSkeleton} />}
 
         {isError && (
           <Alert
@@ -357,7 +377,7 @@ const SpotifySearchList = ({
                 ))}
               </ul>
             )}
-            {isFetching && loadingMore && <ListSkeleton />}
+            {isFetching && loadingMore && <ListSkeleton Item={ItemSkeleton} />}
           </div>
         )}
 
@@ -400,11 +420,11 @@ export const TrackItem = ({
         }
       }}
       className={cn(
-        "group flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4",
+        "group flex h-14 cursor-pointer items-center justify-between rounded-md py-2",
         !track.previewUrl && "cursor-not-allowed opacity-40"
       )}
     >
-      <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
+      <div className="flex h-full w-full max-w-[70vw] space-x-4 md:max-w-[80vw] lg:max-w-[60vw]">
         <div className="relative h-10 w-10 shrink-0">
           <Image
             alt={`${track.title} playing`}

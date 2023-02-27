@@ -21,8 +21,8 @@ import type { SongType } from "@/server/api/routers/discover";
 const ItemSkeleton = () => {
   return (
     <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 px-4 dark:bg-slate-900">
-      {/* number */}
       <div className="flex h-full w-full items-center space-x-4">
+        {/* number */}
         <SkeletonText className="my-auto h-1/3 w-4" />
         {/* image */}
         <SkeletonText className="h-10 w-10 shrink-0" />
@@ -33,19 +33,19 @@ const ItemSkeleton = () => {
           <SkeletonText className="h-4 w-1/4 text-sm" />
         </div>
       </div>
-      <SkeletonText className="my-auto h-1/3 w-[4ch]" />
       {/* time */}
+      <SkeletonText className="my-auto h-1/3 w-[4ch]" />
     </div>
   );
 };
-export const ListSkeleton = () => {
+export const ListSkeleton = ({ Item }: { Item: React.ElementType }) => {
   return (
     <SkeletonContainer>
       <div className="space-y-2">
         {Array(DEFAULT_RESULTS_QTT)
           .fill(null)
           .map((_, id) => (
-            <ItemSkeleton key={id} />
+            <Item key={id} />
           ))}
       </div>
     </SkeletonContainer>
@@ -163,7 +163,7 @@ const Discover = () => {
         className="mb-4"
         autoFocus
       />
-      {isFetching && !loadingMore && <ListSkeleton />}
+      {isFetching && !loadingMore && <ListSkeleton Item={ItemSkeleton} />}
       {isError && (
         <Alert
           severity="error"
@@ -189,7 +189,7 @@ const Discover = () => {
               ))}
             </ul>
           )}
-          {isFetching && loadingMore && <ListSkeleton />}
+          {isFetching && loadingMore && <ListSkeleton Item={ItemSkeleton} />}
           <div className="mt-4 w-full text-center">
             <Button
               onClick={() => {
