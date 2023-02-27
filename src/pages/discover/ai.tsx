@@ -138,14 +138,13 @@ const Discover = () => {
   );
 
   useEffect(() => {
-    const main = document.getElementsByTagName("main");
-    main[0] && main[0].scrollTo({ top: main[0].scrollHeight });
-
     if (isFetched) {
+      const main = document.getElementsByTagName("main");
+      main[0] && main[0].scrollTo({ top: main[0].scrollHeight });
+
       setLoadingMore(false);
     }
-  }, [isFetched, isFetching, loadingMore]);
-  // ^ this dep array might break the default loading more songs behavior
+  }, [isFetched, loadingMore]);
 
   return (
     <Shell heading="Discover" subtitle="Find new songs with AI">
@@ -169,6 +168,7 @@ const Discover = () => {
         <Alert
           severity="error"
           title="Something went wrong"
+          className="mb-2"
           message={error.message}
         />
       )}

@@ -46,7 +46,7 @@ import { Button } from "@/components/ui/core/button";
 import { DEFAULT_SOUND, MIN_VOL_TO_MUTE } from "@/utils/constants";
 import { Progress } from "@/components/ui/progress";
 import { convertToSeconds, formatSongDuration } from "@/utils/song-time";
-// import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -1077,7 +1077,7 @@ const MyApp: AppType<{ session: Session | null }> = ({
           <MusicPlayerProvider>
             <Component {...pageProps} />
             <MusicPlayer />
-            {/* <ReactQueryDevtools initialIsOpen={true} /> */}
+            <ReactQueryDevtools initialIsOpen={true} />
           </MusicPlayerProvider>
         </SessionProvider>
       </ThemeProvider>

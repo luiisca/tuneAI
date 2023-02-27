@@ -27,10 +27,23 @@ const SelectTrigger = React.forwardRef<
 ));
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
+const SelectViewport = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Viewport>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Viewport>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Viewport ref={ref} className={className} {...props}>
+    {children}
+  </SelectPrimitive.Viewport>
+));
+SelectViewport.displayName = SelectPrimitive.Viewport.displayName;
+
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
+    viewportRef?: React.Ref<HTMLDivElement>;
+    customViewport?: boolean;
+  }
+>(({ className, children, viewportRef, customViewport, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -40,9 +53,11 @@ const SelectContent = React.forwardRef<
       )}
       {...props}
     >
-      <SelectPrimitive.Viewport className="p-1">
-        {children}
-      </SelectPrimitive.Viewport>
+      {customViewport ? (
+        <>{children}</>
+      ) : (
+        <SelectViewport className="p-1">{children}</SelectViewport>
+      )}
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 ));
@@ -105,6 +120,7 @@ export {
   SelectValue,
   SelectTrigger,
   SelectContent,
+  SelectViewport,
   SelectLabel,
   SelectItem,
   SelectSeparator,

@@ -1,5 +1,8 @@
 import { env } from "@/env/server.mjs";
-import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
+import {
+  DEFAULT_RESULTS_QTT,
+  DEFAULT_SPOTIFY_RES_QTT,
+} from "@/utils/constants";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -214,8 +217,8 @@ const getAiRecomSongs = async (text: string, first: number) => {
   return uniqueRecomSongs.slice(NEW_SONGS_START_INDEX);
 };
 
-const uniqueSimIds: string[] = [];
-const uniqueSimSongs: (SongResult | null)[] = [];
+let uniqueSimIds: string[] = [];
+let uniqueSimSongs: (SongResult | null)[] = [];
 
 const getAiSimilarSongs = async (trackId: string, first: number) => {
   const res = await fetch(env.API_URL, {
@@ -237,12 +240,20 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
   const NEW_SONGS_START_INDEX =
     first === DEFAULT_RESULTS_QTT ? 0 : first - DEFAULT_RESULTS_QTT;
   const similarTracksResult = songsResponse.data.spotifyTrack.similarTracks;
+
+  if (first === DEFAULT_RESULTS_QTT) {
+    uniqueSimIds = [];
+    uniqueSimSongs = [];
+  }
+
   if ("edges" in similarTracksResult) {
     const songs = similarTracksResult.edges.slice(NEW_SONGS_START_INDEX);
     songs.forEach((song) => {
       if (!uniqueSimIds.includes(song.cursor)) {
         uniqueSimIds.push(song.cursor);
         uniqueSimSongs.push(song);
+
+        return;
       }
 
       uniqueSimSongs.push(null);
@@ -331,7 +342,7 @@ const getSpotifySearchResults = async (
   const query_params = new URLSearchParams({
     q: trackName,
     type: "track",
-    limit: DEFAULT_RESULTS_QTT.toString(),
+    limit: DEFAULT_SPOTIFY_RES_QTT.toString(),
     offset: offset.toString(),
   });
   const res = await fetch(
@@ -444,17 +455,43 @@ export const discoverRouter = createTRPCRouter({
         const { trackId, first } = input;
         let songs: SongType[] = [];
 
-        if (session) {
-          const lastSimSongs = await getAiSimilarSongs(trackId, first);
-          if ("code" in lastSimSongs || "message" in lastSimSongs) {
-            // song not analyzed yet
-            await enqueueSpotifyTrackAnalysis(trackId);
+        const startingTime = Date.now() / 1000;
+        const NOT_ANALYZED_ERR_CODE = "trackNotAnalyzed";
 
+        const recursiveGetAiSimilarSongs = async () => {
+          console.log("RUNNIG RECURSIVE FN");
+          const now = Date.now() / 1000;
+          const lastSimSongs = await getAiSimilarSongs(trackId, first);
+          console.log("LASTSIMSONGS", lastSimSongs);
+          const timeout = now - startingTime >= 30;
+
+          if (timeout) {
+            console.log("TIMEOUT", timeout);
             throw new TRPCError({
-              code: "CONFLICT",
-              message: "Analyzing track...",
+              code: "TIMEOUT",
+              message: "Could not find any similar song. Sorry",
             });
           }
+
+          if (
+            "code" in lastSimSongs &&
+            lastSimSongs.code === NOT_ANALYZED_ERR_CODE
+          ) {
+            console.log("ERROR, RETYRING", lastSimSongs.code);
+            await enqueueSpotifyTrackAnalysis(trackId);
+
+            recursiveGetAiSimilarSongs();
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Could not find any similar song. Retrying...",
+            });
+          }
+
+          return lastSimSongs as SongResult[];
+        };
+
+        if (session) {
+          const lastSimSongs = await recursiveGetAiSimilarSongs();
           const ids = getIdsString(lastSimSongs);
 
           const spotifyTracks = await getSpotifyTracksData(
