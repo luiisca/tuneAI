@@ -1,19 +1,18 @@
 import { debounce } from "lodash";
 import Shell from "@/components/ui/core/shell";
 import { api } from "@/utils/api";
-import {
-  DEFAULT_RESULTS_QTT,
-  DEFAULT_SPOTIFY_RES_QTT,
-} from "@/utils/constants";
+import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
 import Image from "next/image";
 import {
-  Dispatch,
   useContext,
   useEffect,
   useReducer,
   useRef,
   useState,
+  useCallback,
+  useMemo,
 } from "react";
+import type { Dispatch } from "react";
 import {
   Select,
   SelectContent,
@@ -24,17 +23,18 @@ import {
 } from "@/components/ui/core/select";
 import { Input } from "@/components/ui/core/input";
 // import { MusicPlayerContext } from "../_app";
-import { ListSkeleton } from "./ai";
+import { ListSkeleton, TrackItem } from "./ai";
 import { MusicPlayerContext } from "../_app";
 import { Alert } from "@/components/ui/alert";
 import EmptyScreen from "@/components/ui/core/empty-screen";
-import { CircleSlashed } from "lucide-react";
+import { CircleSlashed, Music2 } from "lucide-react";
 import { SongType } from "@/server/api/routers/discover";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { formatSongDuration } from "@/utils/song-time";
 import { cn } from "@/utils/cn";
 import showToast from "@/components/ui/core/notifications";
-import { SkeletonContainer, SkeletonText } from "@/components/ui/skeleton";
+import { SkeletonText } from "@/components/ui/skeleton";
+import useLoadMore from "@/utils/hooks/useLoadMore";
 
 type InitialStateType = {
   searchValue: string;
@@ -57,7 +57,7 @@ const initialState: InitialStateType = {
   spotify: {
     listOpen: false,
     // resPage: 0,
-    resQtt: DEFAULT_SPOTIFY_RES_QTT,
+    resQtt: DEFAULT_RESULTS_QTT,
     loadingMore: false,
   },
   similar: {
@@ -78,15 +78,13 @@ type ACTIONTYPE =
   | {
       type: "RESET_SEARCH";
       searchValue: string;
+    }
+  | {
+      type: "SHOW_MORE_SIMILAR";
+    }
+  | {
+      type: "STOP_LOADING_MORE_SIMILAR";
     };
-// | {
-//     type: "SHOW_MORE";
-//     query: "spotify" | "similar";
-//   }
-// | {
-//     type: "STOP_LOADING_MORE";
-//     query: "spotify" | "similar";
-//   };
 
 const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
   switch (action.type) {
@@ -113,7 +111,7 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
           ...state.spotify,
           listOpen: true,
           resPage: 0,
-          resQtt: DEFAULT_SPOTIFY_RES_QTT,
+          resQtt: DEFAULT_RESULTS_QTT,
         },
         similar: {
           ...state.similar,
@@ -122,26 +120,26 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
         },
       };
     }
-    // case "SHOW_MORE": {
-    //   if (action.query === "spotify") {
-    //     return {
-    //       ...state,
-    //       spotify: {
-    //         ...state.spotify,
-    //         resPage: state.spotify.resPage + 1,
-    //       },
-    //     };
-    //   }
-    // }
-    // case "STOP_LOADING_MORE": {
-    //   return {
-    //     ...state,
-    //     [action.query]: {
-    //       ...state[action.query],
-    //       loadingMore: false,
-    //     },
-    //   };
-    // }
+    case "SHOW_MORE_SIMILAR": {
+      return {
+        ...state,
+        similar: {
+          ...state.similar,
+          resPage: state.similar.resPage + 1,
+          resQtt: (state.similar.resPage + 2) * DEFAULT_RESULTS_QTT,
+          loadingMore: true,
+        },
+      };
+    }
+    case "STOP_LOADING_MORE_SIMILAR": {
+      return {
+        ...state,
+        similar: {
+          ...state.similar,
+          loadingMore: false,
+        },
+      };
+    }
 
     default: {
       return state;
@@ -149,7 +147,7 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
   }
 };
 
-const ItemSkeleton = () => {
+const SpotifyItemSkeleton = () => {
   return (
     <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 pl-8 pr-2 dark:bg-slate-900 md:pr-4">
       <div className="flex h-full w-full items-center space-x-4 ">
@@ -170,7 +168,7 @@ const ItemSkeleton = () => {
 
 const Similar = () => {
   const [state, dispatch] = useReducer(similarReducer, initialState);
-  const { searchValue, selectedTrackId, spotify, similar } = state;
+  const { selectedTrackId, spotify, similar } = state;
 
   const utils = api.useContext();
 
@@ -219,6 +217,25 @@ const Similar = () => {
     }
   );
 
+  const updateFn = useCallback(() => {
+    dispatch({
+      type: "SHOW_MORE_SIMILAR",
+    });
+  }, []);
+
+  const [loadMore] = useLoadMore<HTMLUListElement>({
+    loadingMore: similar.loadingMore,
+    update: updateFn,
+    isFetching,
+    isFetched,
+  });
+
+  useEffect(() => {
+    if (isFetched) {
+      dispatch({ type: "STOP_LOADING_MORE_SIMILAR" });
+    }
+  }, [isFetched, similar.loadingMore]);
+
   return (
     <Shell heading="Discover" subtitle="Find similar songs with AI">
       <Select
@@ -250,11 +267,49 @@ const Similar = () => {
         </SelectContent>
       </Select>
 
-      {isError && error && <span>{error.message}</span>}
-      {/* similar songs */}
-      {tracks?.map((track, index) => (
-        <TrackItem index={index} track={track} key={track.id} />
-      ))}
+      {isFetching && !similar.loadingMore && <ListSkeleton />}
+      {isError && (
+        <Alert
+          severity="error"
+          title="Something went wrong"
+          className="mb-2"
+          message={error.message}
+        />
+      )}
+      {!tracks && !isFetching && (
+        <EmptyScreen
+          Icon={() => <Music2 />}
+          headline="Start searching"
+          description="What are you waiting for"
+        />
+      )}
+      {tracks && tracks.length !== 0 && (
+        <div className="h-[calc(100%-11rem)] ">
+          {(!isFetching || (isFetching && similar.loadingMore)) && (
+            <ul
+              className={cn(
+                "-mr-4 h-full space-y-2 overflow-y-auto pr-4 pb-3 lg:-mr-12 lg:pr-12",
+                // custom scrollbar
+                "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 scrollbar-thumb-rounded-md",
+                "dark:scrollbar-thumb-accent dark:hover:scrollbar-thumb-accentBright"
+              )}
+              onScroll={(e) => loadMore(e)}
+            >
+              {tracks.map((track, index) => (
+                <TrackItem index={index} track={track} key={track.id} />
+              ))}
+              {isFetching && similar.loadingMore && <ListSkeleton />}
+            </ul>
+          )}
+        </div>
+      )}
+      {tracks && tracks.length === 0 && (
+        <EmptyScreen
+          Icon={() => <CircleSlashed />}
+          headline="No results"
+          description="Could not find any similar tracks. Please try again."
+        />
+      )}
     </Shell>
   );
 };
@@ -282,7 +337,7 @@ const SpotifySearchList = ({
   } = api.discover.getSongs.spotify.useQuery(
     {
       trackName: searchValue,
-      offset: resPage * DEFAULT_SPOTIFY_RES_QTT,
+      offset: resPage * DEFAULT_RESULTS_QTT,
     },
     {
       enabled: !!searchValue || !!resPage,
@@ -296,14 +351,14 @@ const SpotifySearchList = ({
         }
         const prevData = utils.discover.getSongs.spotify.getData({
           trackName: searchValue,
-          offset: resPage * DEFAULT_SPOTIFY_RES_QTT - DEFAULT_SPOTIFY_RES_QTT,
+          offset: resPage * DEFAULT_RESULTS_QTT - DEFAULT_RESULTS_QTT,
         });
         console.log("PREV data", prevData);
 
         utils.discover.getSongs.spotify.setData(
           {
             trackName: searchValue,
-            offset: resPage * DEFAULT_SPOTIFY_RES_QTT,
+            offset: resPage * DEFAULT_RESULTS_QTT,
           },
           (oldData) => {
             console.log("old data", oldData);
@@ -317,45 +372,41 @@ const SpotifySearchList = ({
       },
     }
   );
+
   useEffect(() => {
     if (isFetched) {
       setLoadingMore(false);
     }
   }, [isFetched, loadingMore]);
 
+  const updateFn = useCallback(() => {
+    console.log("update fn run", resPage);
+    setResPage(resPage + 1);
+    setLoadingMore(true);
+  }, [resPage]);
+
+  const [loadMore] = useLoadMore<HTMLDivElement>({
+    loadingMore,
+    update: updateFn,
+    isFetching,
+    isFetched,
+  });
+
   return (
     <SelectViewport
       className="p-1"
       ref={tracksListRef}
-      onScroll={debounce((e) => {
-        if (e && !loadingMore) {
-          const el = e.target as HTMLDivElement;
-          const clientHeight = el.clientHeight;
-          const scrollHeight = el.scrollHeight;
-          const scrollTop = el.scrollTop;
-
-          console.log(
-            "values",
-            "top",
-            scrollTop,
-            "cleint",
-            clientHeight,
-            "height",
-            scrollHeight
-          );
-          if (scrollTop + clientHeight >= scrollHeight) {
-            console.log("bottom reached");
-            setResPage(resPage + 1);
-            setLoadingMore(true);
-          }
-        }
-      }, 400)}
+      onScroll={(e) => {
+        loadMore(e);
+      }}
     >
       <SelectItem value="loading" className="h-0 p-0 opacity-0">
         Loading
       </SelectItem>
       <div>
-        {isFetching && !loadingMore && <ListSkeleton Item={ItemSkeleton} />}
+        {isFetching && !loadingMore && (
+          <ListSkeleton Item={SpotifyItemSkeleton} />
+        )}
 
         {isError && (
           <Alert
@@ -372,12 +423,14 @@ const SpotifySearchList = ({
               <ul className="space-y-2">
                 {tracks.map((track, index) => (
                   <SelectItem value={track.id} key={track.id}>
-                    <TrackItem index={index} track={track} />
+                    <SptifyTrackItem index={index} track={track} />
                   </SelectItem>
                 ))}
               </ul>
             )}
-            {isFetching && loadingMore && <ListSkeleton Item={ItemSkeleton} />}
+            {isFetching && loadingMore && (
+              <ListSkeleton Item={SpotifyItemSkeleton} />
+            )}
           </div>
         )}
 
@@ -393,7 +446,7 @@ const SpotifySearchList = ({
   );
 };
 
-export const TrackItem = ({
+export const SptifyTrackItem = ({
   index,
   track,
 }: {

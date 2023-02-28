@@ -1,8 +1,5 @@
 import { env } from "@/env/server.mjs";
-import {
-  DEFAULT_RESULTS_QTT,
-  DEFAULT_SPOTIFY_RES_QTT,
-} from "@/utils/constants";
+import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -258,8 +255,8 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
 
       uniqueSimSongs.push(null);
     });
-    // console.log("SIMILAR SONGS", songs);
-    // console.log("UNIQUE songs", uniqueSimSongs);
+    console.log("SIMILAR SONGS", songs);
+    console.log("UNIQUE songs", uniqueSimSongs);
 
     return uniqueSimSongs.slice(NEW_SONGS_START_INDEX);
   }
@@ -342,7 +339,7 @@ const getSpotifySearchResults = async (
   const query_params = new URLSearchParams({
     q: trackName,
     type: "track",
-    limit: DEFAULT_SPOTIFY_RES_QTT.toString(),
+    limit: DEFAULT_RESULTS_QTT.toString(),
     offset: offset.toString(),
   });
   const res = await fetch(

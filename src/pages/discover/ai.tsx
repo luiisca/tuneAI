@@ -17,6 +17,7 @@ import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { Button } from "@/components/ui/core/button";
 import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
 import type { SongType } from "@/server/api/routers/discover";
+import useLoadMore from "@/utils/hooks/useLoadMore";
 
 const ItemSkeleton = () => {
   return (
@@ -38,7 +39,11 @@ const ItemSkeleton = () => {
     </div>
   );
 };
-export const ListSkeleton = ({ Item }: { Item: React.ElementType }) => {
+export const ListSkeleton = ({
+  Item = ItemSkeleton,
+}: {
+  Item?: React.ElementType;
+}) => {
   return (
     <SkeletonContainer>
       <div className="space-y-2">
@@ -52,7 +57,7 @@ export const ListSkeleton = ({ Item }: { Item: React.ElementType }) => {
   );
 };
 
-const Discover = () => {
+const Ai = () => {
   const [searchValue, setSearchValue] = useState("");
   const [resultsPage, setResultsPage] = useState(1);
   const [resultsQtt, setResultsQtt] = useState(DEFAULT_RESULTS_QTT);
@@ -146,6 +151,19 @@ const Discover = () => {
     }
   }, [isFetched, loadingMore]);
 
+  const updateFn = useCallback(() => {
+    setResultsPage(resultsPage + 1);
+    setResultsQtt((resultsPage + 1) * DEFAULT_RESULTS_QTT);
+    setLoadingMore(true);
+  }, [resultsPage, loadingMore]);
+
+  const [loadMore] = useLoadMore<HTMLUListElement>({
+    loadingMore: loadingMore,
+    update: updateFn,
+    isFetching,
+    isFetched,
+  });
+
   return (
     <Shell heading="Discover" subtitle="Find new songs with AI">
       <Input
@@ -181,28 +199,23 @@ const Discover = () => {
       )}
 
       {recomSongs && recomSongs.length !== 0 && (
-        <div>
+        <div className="h-[calc(100%-11rem)] ">
           {(!isFetching || (isFetching && loadingMore)) && (
-            <ul className="space-y-2 overflow-y-auto pb-2">
+            <ul
+              className={cn(
+                "-mr-4 h-full space-y-2 overflow-y-auto pr-4 pb-3 lg:-mr-12 lg:pr-12",
+                // custom scrollbar
+                "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 scrollbar-thumb-rounded-md",
+                "dark:scrollbar-thumb-accent dark:hover:scrollbar-thumb-accentBright"
+              )}
+              onScroll={(e) => loadMore(e)}
+            >
               {recomSongs.map((song, index) => (
                 <TrackItem track={song} index={index} key={song.id} />
               ))}
             </ul>
           )}
           {isFetching && loadingMore && <ListSkeleton Item={ItemSkeleton} />}
-          <div className="mt-4 w-full text-center">
-            <Button
-              onClick={() => {
-                // load more
-                setResultsPage(resultsPage + 1);
-                setResultsQtt((resultsPage + 1) * DEFAULT_RESULTS_QTT);
-                setLoadingMore(true);
-              }}
-              disabled={isFetching && loadingMore}
-            >
-              Show more
-            </Button>
-          </div>
         </div>
       )}
       {recomSongs && recomSongs.length === 0 && (
@@ -276,10 +289,10 @@ export const TrackItem = ({
           <ScanSimilarsBttn
             disabled={!track.previewUrl}
             index={index}
-            className="opacity-0 group-hover:opacity-100"
+            className="group-hover:opacity-100 lg:opacity-0"
           />
           <FavouriteBttn
-            className="group opacity-0 group-hover:opacity-100"
+            className="group group-hover:opacity-100 lg:opacity-0"
             iconClassName="h-4 w-4"
             songPos={index}
             disabled={!track.previewUrl}
@@ -293,4 +306,4 @@ export const TrackItem = ({
   );
 };
 
-export default Discover;
+export default Ai;
