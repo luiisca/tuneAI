@@ -43,165 +43,20 @@ import {
 } from "@/components/ui/dropdown";
 import React from "react";
 import { Button } from "@/components/ui/core/button";
-import { DEFAULT_SOUND, MIN_VOL_TO_MUTE } from "@/utils/constants";
+import {
+  DEFAULT_RESULTS_QTT,
+  DEFAULT_SOUND,
+  MIN_VOL_TO_MUTE,
+} from "@/utils/constants";
 import { Progress } from "@/components/ui/progress";
 import { convertToSeconds, formatSongDuration } from "@/utils/song-time";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-
+import { useRouter } from "next/router";
 const fontSans = FontSans({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
 });
-
-export const ScanSimilarsBttn = ({
-  index,
-  musicPlayer,
-  className,
-  iconClassName,
-  ...props
-}: React.ComponentProps<typeof Button> & {
-  index?: number;
-  musicPlayer?: boolean;
-  className?: string;
-  iconClassName?: string;
-}) => {
-  const {
-    state: { songsList, crrPlayingSong },
-    dispatch,
-  } = useContext(MusicPlayerContext);
-  const scanning =
-    (songsList &&
-      (index === 0 || (index && index > 0)) &&
-      songsList[index]?.scanning) ||
-    crrPlayingSong?.scanning;
-
-  const disabled = props.disabled || scanning;
-
-  index = crrPlayingSong?.position || index;
-
-  return (
-    <button
-      {...props}
-      className={cn(
-        "group p-3 md:p-2",
-        disabled && "cursor-not-allowed",
-        className
-      )}
-      onClick={() => {
-        if (!disabled) {
-          dispatch({
-            type: "SET_SCANNING",
-            index: index as number,
-            scanning: true,
-          });
-          showToast("Discovering similar songs!", "success");
-          setTimeout(() => {
-            dispatch({
-              type: "SET_SCANNING",
-              index: index as number,
-              scanning: false,
-            });
-            showToast("10 songs found", "success");
-          }, 3000);
-        }
-      }}
-    >
-      <ScanLine
-        className={cn(
-          "h-4 w-4",
-          "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
-          scanning && "!text-accentBright",
-          iconClassName
-        )}
-      />
-    </button>
-  );
-};
-export const FavouriteBttn = ({
-  className,
-  iconClassName,
-  songPos,
-  ...props
-}: React.ComponentProps<typeof Button> & {
-  className?: string;
-  iconClassName?: string;
-  songPos: number;
-}) => {
-  const {
-    state: { songsList, crrPlayingSong },
-    dispatch,
-  } = useContext(MusicPlayerContext);
-  const song =
-    (songsList &&
-      (songPos === 0 || (songPos && songPos > 0)) &&
-      songsList[songPos]) ||
-    crrPlayingSong;
-
-  // console.log("SONG", song);
-  const scanning = song && song.scanning;
-  const favourite = song && song.favourite;
-  const disabled = props.disabled || scanning;
-
-  return (
-    <button
-      {...props}
-      className={cn(
-        "p-2",
-        disabled && "cursor-not-allowed",
-        className ? className : ""
-      )}
-      onClick={() => {
-        if (songsList && !disabled) {
-          !favourite && showToast("Coming Soon!", "warning");
-          dispatch({ type: "TOGGLE_FAVOURITE", songPos, favourite: true });
-          setTimeout(() => {
-            dispatch({ type: "TOGGLE_FAVOURITE", songPos, favourite: false });
-          }, 1000);
-        }
-      }}
-    >
-      <Heart
-        className={cn(
-          "text-slate-600 dark:text-slate-400",
-          !disabled &&
-            !favourite &&
-            "group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
-          disabled && "text-slate-400",
-          favourite && "fill-accent text-accent dark:text-accent",
-          iconClassName
-        )}
-      />
-    </button>
-  );
-};
-
-const createCtx = <StateType, ActionType>(
-  reducer: React.Reducer<StateType, ActionType>,
-  initialState: StateType
-) => {
-  const defaultDispatch: React.Dispatch<ActionType> = () => initialState;
-  const ctx = React.createContext({
-    state: initialState,
-    dispatch: defaultDispatch,
-  });
-
-  const Provider = (props: PropsWithChildren) => {
-    const [state, dispatch] = useReducer(reducer, initialState);
-
-    return (
-      <ctx.Provider
-        {...props}
-        value={{
-          state,
-          dispatch,
-        }}
-      />
-    );
-  };
-
-  return [ctx, Provider] as const;
-};
 
 type ActionType =
   | {
@@ -235,8 +90,25 @@ type ActionType =
     }
   | {
       type: "SELECT_SONG";
+      forwardLoadingMore?: boolean;
       songPos: number;
       position?: "prev" | "next";
+      loadingMore?: boolean;
+      trackReady?: boolean;
+    }
+  | {
+      type: "RESET_SEARCH";
+    }
+  | {
+      type: "SHOW_MORE_SIMILAR";
+      // resQtt: number;
+    }
+  | {
+      type: "STOP_LOADING_MORE_SIMILAR";
+    }
+  | {
+      type: "SAVE_CRR_ROUTE";
+      route: (typeof playerPages)[number];
     };
 
 type PlayerSong = {
@@ -249,7 +121,9 @@ type PlayerSong = {
   favourite: boolean;
   audioSrc: string;
 };
+const playerPages = ["ai", "similar"] as const;
 type InitStateType = {
+  crrRoute: (typeof playerPages)[number];
   audioRef: React.MutableRefObject<HTMLAudioElement | null>;
   songsList: PlayerSong[] | null;
   playing: boolean;
@@ -257,6 +131,45 @@ type InitStateType = {
   crrPlayingSong: PlayerSong | null;
   loop: boolean;
   trackReady: boolean | null;
+  similar: {
+    forwardLoadingMore: boolean;
+    resPage: number;
+    resQtt: number;
+    loadingMore: boolean;
+  };
+  ai: {
+    forwardLoadingMore: boolean;
+    resPage: number;
+    resQtt: number;
+    loadingMore: boolean;
+  };
+};
+
+const createCtx = <StateType, ActionType>(
+  reducer: React.Reducer<StateType, ActionType>,
+  initialState: StateType
+) => {
+  const defaultDispatch: React.Dispatch<ActionType> = () => initialState;
+  const ctx = React.createContext({
+    state: initialState,
+    dispatch: defaultDispatch,
+  });
+
+  const Provider = (props: PropsWithChildren) => {
+    const [state, dispatch] = useReducer(reducer, initialState);
+
+    return (
+      <ctx.Provider
+        {...props}
+        value={{
+          state,
+          dispatch,
+        }}
+      />
+    );
+  };
+
+  return [ctx, Provider] as const;
 };
 
 const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
@@ -265,6 +178,12 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
       return {
         ...state,
         songsList: action.songs,
+      };
+    }
+    case "SAVE_CRR_ROUTE": {
+      return {
+        ...state,
+        crrRoute: action.route,
       };
     }
     case "TOGGLE_PLAY": {
@@ -340,42 +259,120 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         ? action.songPos + 1
         : action.songPos;
 
+      const { songsList, audioRef } = state;
+
       const nonNegativeSongPos =
         action.songPos === 0 || (action.songPos && action.songPos > 0);
 
       const getClosestPlayableSong = () => {
-        if (state.songsList && !state.songsList[positionId]?.audioSrc) {
+        if (songsList && (next || prev) && !songsList[positionId]?.audioSrc) {
+          console.log("forward clicked");
+          console.log(
+            "positionID",
+            positionId,
+            "songsList length",
+            songsList.length
+          );
+          if (next && positionId >= songsList.length) {
+            console.log("latest el selected, returning load more");
+            return "LOAD_MORE";
+          }
           for (
             let i = positionId;
-            prev ? i >= 0 : i < state.songsList.length;
+            prev ? i >= 0 : i < songsList.length;
             prev ? i-- : i++
           ) {
-            if (state.songsList[i]?.audioSrc) {
-              return state.songsList[i];
+            console.log("inside for", songsList.length, "index", i);
+            if (songsList[i]?.audioSrc) {
+              console.log("audio availabel");
+              return songsList[i];
+            } else if (next && songsList.length - 1 === i) {
+              console.log("last item selected");
+              // is the last one ans still no audio, return load more signal
+              return "LOAD_MORE";
             }
           }
         }
 
-        if (state.songsList) {
-          return state.songsList[positionId];
+        if (songsList) {
+          console.log("current one selected, returning crr song");
+          return songsList[positionId];
         }
       };
-      // set audioRef src
+
+      const closestSongRes = getClosestPlayableSong();
+      console.log("closestSongRes", closestSongRes);
+
+      if (closestSongRes === "LOAD_MORE") {
+        console.log("updating state to load more");
+        console.log("forwarding", action.forwardLoadingMore);
+        return {
+          ...state,
+          [state.crrRoute]: {
+            ...state[state.crrRoute],
+            forwardLoadingMore: true,
+            resPage: state[state.crrRoute].resPage + 1,
+            resQtt: (state[state.crrRoute].resPage + 1) * DEFAULT_RESULTS_QTT,
+            loadingMore: true,
+          },
+          trackReady: action.trackReady || false,
+        };
+      }
       if (
-        state.audioRef &&
-        state.audioRef.current &&
+        audioRef &&
+        audioRef.current &&
         nonNegativeSongPos &&
-        state.songsList
+        songsList &&
+        closestSongRes
       ) {
-        state.audioRef.current.src = getClosestPlayableSong()?.audioSrc || "";
+        console.log("setting audio src");
+        // set audioRef src
+        audioRef.current.src = closestSongRes.audioSrc || "";
       }
 
       return {
         ...state,
         crrPlayingPos: action.songPos,
         crrPlayingSong:
-          (state.songsList && nonNegativeSongPos && getClosestPlayableSong()) ||
+          (songsList &&
+            nonNegativeSongPos &&
+            (getClosestPlayableSong() as PlayerSong)) ||
           null,
+        [state.crrRoute]: {
+          ...state[state.crrRoute],
+          forwardLoadingMore: action.forwardLoadingMore || false,
+        },
+      };
+    }
+    case "RESET_SEARCH": {
+      return {
+        ...state,
+        [state.crrRoute]: {
+          ...state[state.crrRoute as "ai" | "similar"],
+          resPage: 1,
+          resQtt: DEFAULT_RESULTS_QTT,
+        },
+      };
+    }
+
+    case "SHOW_MORE_SIMILAR": {
+      return {
+        ...state,
+        [state.crrRoute]: {
+          ...state[state.crrRoute],
+          resPage: state[state.crrRoute].resPage + 1,
+          resQtt: (state[state.crrRoute].resPage + 1) * DEFAULT_RESULTS_QTT,
+          loadingMore: true,
+        },
+      };
+    }
+    case "STOP_LOADING_MORE_SIMILAR": {
+      return {
+        ...state,
+        [state.crrRoute]: {
+          ...state[state.crrRoute],
+          loadingMore: false,
+        },
       };
     }
 
@@ -386,6 +383,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
 };
 
 const musicPlayerInitState: InitStateType = {
+  crrRoute: playerPages[0],
   playing: false,
   crrPlayingId: null,
   crrPlayingSong: null,
@@ -394,6 +392,18 @@ const musicPlayerInitState: InitStateType = {
   songsList: null,
   trackReady: null,
   audioRef: { current: null },
+  similar: {
+    forwardLoadingMore: false,
+    resPage: 1,
+    resQtt: DEFAULT_RESULTS_QTT,
+    loadingMore: false,
+  },
+  ai: {
+    forwardLoadingMore: false,
+    resPage: 1,
+    resQtt: DEFAULT_RESULTS_QTT,
+    loadingMore: false,
+  },
 };
 
 const [ctx, MusicPlayerProvider] = createCtx(
@@ -403,12 +413,17 @@ const [ctx, MusicPlayerProvider] = createCtx(
 export const MusicPlayerContext = ctx;
 
 const MusicPlayer = () => {
+  const router = useRouter();
   const { status } = useSession();
 
   const {
     state: { crrPlayingSong, loop, trackReady },
     dispatch,
   } = useContext(MusicPlayerContext);
+  useEffect(() => {
+    const crrRoute = router.pathname.includes("similar") ? "similar" : "ai";
+    dispatch({ type: "SAVE_CRR_ROUTE", route: crrRoute });
+  }, []);
 
   const [playerOpen, setPlayerOpen] = useState(false);
   const [soundHovered, setSoundHovered] = useState(false);
@@ -860,15 +875,6 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       ? crrPlayingSong.position - 1 === 0 && !songsList[0]?.audioSrc
       : false;
   const firstSong = crrPlayingSong ? crrPlayingSong.position === 0 : false;
-  const lastSong =
-    crrPlayingSong && songsList
-      ? songsList.length - 1 === crrPlayingSong.position
-      : false;
-  const nextInvalidLast =
-    crrPlayingSong && songsList
-      ? crrPlayingSong.position + 1 === songsList.length - 1 &&
-        !songsList[songsList.length - 1]?.audioSrc
-      : false;
   const scanning = crrPlayingSong?.scanning;
 
   return (
@@ -939,12 +945,11 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       <button
         className={cn(
           "group p-3 md:p-2",
-          (scanning || lastSong || nextInvalidLast) &&
-            "cursor-not-allowed text-slate-400"
+          scanning && "cursor-not-allowed text-slate-400"
         )}
-        disabled={scanning || lastSong || nextInvalidLast}
+        disabled={scanning}
         onClick={() => {
-          if (crrPlayingSong && !lastSong && !nextInvalidLast) {
+          if (crrPlayingSong) {
             dispatch({
               type: "SELECT_SONG",
               position: "next",
@@ -957,11 +962,8 @@ const PlaybackControls = ({ className }: { className?: string }) => {
           className={cn(
             "h-8 w-8 fill-current md:h-4 md:w-4",
             !scanning &&
-              !lastSong &&
-              !nextInvalidLast &&
               "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            (scanning || lastSong || nextInvalidLast) &&
-              "fill-slate-400 md:text-slate-400"
+            scanning && "fill-slate-400 md:text-slate-400"
           )}
         />
       </button>
@@ -1059,7 +1061,129 @@ export const LoadingIcon = ({
   </div>
 );
 
-// "md:border-t md:border-t-slate-700 md:bg-slate-900 "
+export const ScanSimilarsBttn = ({
+  index,
+  musicPlayer,
+  className,
+  iconClassName,
+  ...props
+}: React.ComponentProps<typeof Button> & {
+  index?: number;
+  musicPlayer?: boolean;
+  className?: string;
+  iconClassName?: string;
+}) => {
+  const {
+    state: { songsList, crrPlayingSong },
+    dispatch,
+  } = useContext(MusicPlayerContext);
+  const scanning =
+    (songsList &&
+      (index === 0 || (index && index > 0)) &&
+      songsList[index]?.scanning) ||
+    crrPlayingSong?.scanning;
+
+  const disabled = props.disabled || scanning;
+
+  index = crrPlayingSong?.position || index;
+
+  return (
+    <button
+      {...props}
+      className={cn(
+        "group p-3 md:p-2",
+        disabled && "cursor-not-allowed",
+        className
+      )}
+      onClick={() => {
+        if (!disabled) {
+          dispatch({
+            type: "SET_SCANNING",
+            index: index as number,
+            scanning: true,
+          });
+          showToast("Discovering similar songs!", "success");
+          setTimeout(() => {
+            dispatch({
+              type: "SET_SCANNING",
+              index: index as number,
+              scanning: false,
+            });
+            showToast("10 songs found", "success");
+          }, 3000);
+        }
+      }}
+    >
+      <ScanLine
+        className={cn(
+          "h-4 w-4",
+          "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
+          scanning && "!text-accentBright",
+          iconClassName
+        )}
+      />
+    </button>
+  );
+};
+
+export const FavouriteBttn = ({
+  className,
+  iconClassName,
+  songPos,
+  ...props
+}: React.ComponentProps<typeof Button> & {
+  className?: string;
+  iconClassName?: string;
+  songPos: number;
+}) => {
+  const {
+    state: { songsList, crrPlayingSong },
+    dispatch,
+  } = useContext(MusicPlayerContext);
+  const song =
+    (songsList &&
+      (songPos === 0 || (songPos && songPos > 0)) &&
+      songsList[songPos]) ||
+    crrPlayingSong;
+
+  // console.log("SONG", song);
+  const scanning = song && song.scanning;
+  const favourite = song && song.favourite;
+  const disabled = props.disabled || scanning;
+
+  return (
+    <button
+      {...props}
+      className={cn(
+        "p-2",
+        disabled && "cursor-not-allowed",
+        className ? className : ""
+      )}
+      onClick={() => {
+        if (songsList && !disabled) {
+          !favourite && showToast("Coming Soon!", "warning");
+          dispatch({ type: "TOGGLE_FAVOURITE", songPos, favourite: true });
+          setTimeout(() => {
+            dispatch({ type: "TOGGLE_FAVOURITE", songPos, favourite: false });
+          }, 1000);
+        }
+      }}
+    >
+      <Heart
+        className={cn(
+          "text-slate-600 dark:text-slate-400",
+          !disabled &&
+            !favourite &&
+            "group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
+          disabled && "text-slate-400",
+          favourite && "fill-accent text-accent dark:text-accent",
+          iconClassName
+        )}
+      />
+    </button>
+  );
+};
+
 const MyApp: AppType<{ session: Session | null }> = ({
   Component,
   pageProps: { session, ...pageProps },

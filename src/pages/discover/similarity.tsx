@@ -10,9 +10,7 @@ import {
   useRef,
   useState,
   useCallback,
-  useMemo,
 } from "react";
-import type { Dispatch } from "react";
 import {
   Select,
   SelectContent,
@@ -41,12 +39,6 @@ type InitialStateType = {
   selectedTrackId: null | string;
   spotify: {
     listOpen: boolean;
-    // resPage: number;
-    resQtt: number;
-    loadingMore: boolean;
-  };
-  similar: {
-    resPage: number;
     resQtt: number;
     loadingMore: boolean;
   };
@@ -56,12 +48,6 @@ const initialState: InitialStateType = {
   selectedTrackId: null,
   spotify: {
     listOpen: false,
-    // resPage: 0,
-    resQtt: DEFAULT_RESULTS_QTT,
-    loadingMore: false,
-  },
-  similar: {
-    resPage: 0,
     resQtt: DEFAULT_RESULTS_QTT,
     loadingMore: false,
   },
@@ -78,12 +64,6 @@ type ACTIONTYPE =
   | {
       type: "RESET_SEARCH";
       searchValue: string;
-    }
-  | {
-      type: "SHOW_MORE_SIMILAR";
-    }
-  | {
-      type: "STOP_LOADING_MORE_SIMILAR";
     };
 
 const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
@@ -112,31 +92,6 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
           listOpen: true,
           resPage: 0,
           resQtt: DEFAULT_RESULTS_QTT,
-        },
-        similar: {
-          ...state.similar,
-          resPage: 0,
-          resQtt: DEFAULT_RESULTS_QTT,
-        },
-      };
-    }
-    case "SHOW_MORE_SIMILAR": {
-      return {
-        ...state,
-        similar: {
-          ...state.similar,
-          resPage: state.similar.resPage + 1,
-          resQtt: (state.similar.resPage + 2) * DEFAULT_RESULTS_QTT,
-          loadingMore: true,
-        },
-      };
-    }
-    case "STOP_LOADING_MORE_SIMILAR": {
-      return {
-        ...state,
-        similar: {
-          ...state.similar,
-          loadingMore: false,
         },
       };
     }
@@ -168,13 +123,13 @@ const SpotifyItemSkeleton = () => {
 
 const Similar = () => {
   const [state, dispatch] = useReducer(similarReducer, initialState);
-  const { selectedTrackId, spotify, similar } = state;
+  const { selectedTrackId, spotify } = state;
 
   const utils = api.useContext();
 
   const {
-    state: { songsList },
-    dispatch: dispatchPlayerContext,
+    state: { songsList, similar },
+    dispatch: dispatchPlayer,
   } = useContext(MusicPlayerContext);
 
   const {
@@ -189,12 +144,24 @@ const Similar = () => {
       first: similar.resQtt,
     },
     {
-      enabled: !!selectedTrackId || !!similar.resPage,
+      enabled: !!selectedTrackId && !!similar.resPage,
       keepPreviousData: true,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
-      onSuccess: () => {
+      onSuccess: (data) => {
+        const formatTracksForSongsList = (tracks: SongType[]) => {
+          return tracks.map((track, index: number) => ({
+            position: (songsList?.length || 0) + index,
+            id: track.id,
+            title: track.title,
+            artists: track.artists,
+            scanning: false,
+            coverUrl: track.coverUrl,
+            favourite: false, // @TODO: get them from spotify
+            audioSrc: track.previewUrl || "",
+          }));
+        };
         const prevData = utils.discover.getSongs.similar.getData({
           trackId: selectedTrackId as string,
           first: similar.resQtt - DEFAULT_RESULTS_QTT,
@@ -206,11 +173,32 @@ const Similar = () => {
             first: similar.resQtt,
           },
           (oldData) => {
+            // first load, there are no prevData
+            if (similar.resQtt === DEFAULT_RESULTS_QTT && data) {
+              dispatchPlayer({
+                type: "SAVE_SONGS",
+                songs: [...formatTracksForSongsList(data)],
+              });
+
+              return data;
+            }
             if (prevData && oldData) {
+              dispatchPlayer({
+                type: "SAVE_SONGS",
+                songs: [...songsList!, ...formatTracksForSongsList(oldData)],
+              });
+
               return [...prevData, ...oldData];
             }
 
-            return oldData;
+            if (oldData) {
+              dispatchPlayer({
+                type: "SAVE_SONGS",
+                songs: [...formatTracksForSongsList(oldData)],
+              });
+
+              return oldData;
+            }
           }
         );
       },
@@ -218,7 +206,7 @@ const Similar = () => {
   );
 
   const updateFn = useCallback(() => {
-    dispatch({
+    dispatchPlayer({
       type: "SHOW_MORE_SIMILAR",
     });
   }, []);
@@ -231,8 +219,33 @@ const Similar = () => {
   });
 
   useEffect(() => {
+    console.log(
+      "isFetched",
+      isFetched,
+      "simlar loadinMroe",
+      similar.loadingMore,
+      "loading more",
+      similar.loadingMore
+    );
     if (isFetched) {
-      dispatch({ type: "STOP_LOADING_MORE_SIMILAR" });
+      dispatchPlayer({ type: "STOP_LOADING_MORE_SIMILAR" });
+
+      const prevData = utils.discover.getSongs.similar.getData({
+        trackId: selectedTrackId as string,
+        first: similar.resQtt - DEFAULT_RESULTS_QTT,
+      });
+      console.log("prevData", prevData);
+      if (prevData && similar.forwardLoadingMore) {
+        console.log("ISFETCHED, dispatching", prevData);
+        dispatchPlayer({
+          type: "SELECT_SONG",
+          forwardLoadingMore: false,
+          songPos: prevData.length - 1,
+          position: "next",
+          trackReady: true,
+          loadingMore: false,
+        });
+      }
     }
   }, [isFetched, similar.loadingMore]);
 
@@ -254,6 +267,7 @@ const Similar = () => {
             const { target } = e as Event & { target: HTMLInputElement };
             const text = target.value.trim();
             dispatch({ type: "RESET_SEARCH", searchValue: text });
+            dispatchPlayer({ type: "RESET_SEARCH" });
           }, 800)}
         />
         <SelectTrigger className="h-0 border-0 p-0 opacity-0">
@@ -263,7 +277,7 @@ const Similar = () => {
           customViewport
           className="disable-focus-visible ml-auto w-full max-w-[95vw]"
         >
-          <SpotifySearchList state={state} dispatch={dispatch} />
+          <SpotifySearchList state={state} />
         </SelectContent>
       </Select>
 
@@ -290,8 +304,8 @@ const Similar = () => {
               className={cn(
                 "-mr-4 h-full space-y-2 overflow-y-auto pr-4 pb-3 lg:-mr-12 lg:pr-12",
                 // custom scrollbar
-                "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 scrollbar-thumb-rounded-md",
-                "dark:scrollbar-thumb-accent dark:hover:scrollbar-thumb-accentBright"
+                "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-rounded-md",
+                "scrollbar-thumb-accent hover:scrollbar-thumb-accentBright"
               )}
               onScroll={(e) => loadMore(e)}
             >
@@ -314,13 +328,7 @@ const Similar = () => {
   );
 };
 
-const SpotifySearchList = ({
-  state,
-  dispatch,
-}: {
-  state: typeof initialState;
-  dispatch: Dispatch<ACTIONTYPE>;
-}) => {
+const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
   const { searchValue } = state;
   const tracksListRef = useRef<HTMLDivElement>(null);
   const [resPage, setResPage] = useState(0);

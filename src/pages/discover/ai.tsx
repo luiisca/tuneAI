@@ -59,17 +59,10 @@ export const ListSkeleton = ({
 
 const Ai = () => {
   const [searchValue, setSearchValue] = useState("");
-  const [resultsPage, setResultsPage] = useState(1);
-  const [resultsQtt, setResultsQtt] = useState(DEFAULT_RESULTS_QTT);
-  const [loadingMore, setLoadingMore] = useState(false);
   const utils = api.useContext();
-  const reset = useCallback(() => {
-    setResultsPage(1);
-    setResultsQtt(DEFAULT_RESULTS_QTT);
-  }, []);
 
   const {
-    state: { songsList },
+    state: { songsList, ai },
     dispatch,
   } = useContext(MusicPlayerContext);
 
@@ -80,16 +73,16 @@ const Ai = () => {
     isError,
     error,
   } = api.discover.getSongs.ai.useQuery(
-    { text: searchValue.trim(), first: resultsQtt },
+    { text: searchValue.trim(), first: ai.resQtt },
     {
-      enabled: !!searchValue.trim() && !!resultsQtt,
+      enabled: !!searchValue.trim() && !!ai.resQtt,
       keepPreviousData: true,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
       onSuccess: (data) => {
         console.log("procedure DATA", data);
-        console.log("resutlsQTT", resultsQtt);
+        console.log("resutlsQTT", ai.resQtt);
         const formatTracksForSongsList = (tracks: SongType[]) => {
           return tracks.map((track, index: number) => ({
             position: (songsList?.length || 0) + index,
@@ -104,20 +97,21 @@ const Ai = () => {
         };
         const prevData = utils.discover.getSongs.ai.getData({
           text: searchValue,
-          first: resultsQtt - DEFAULT_RESULTS_QTT,
+          first: ai.resQtt - DEFAULT_RESULTS_QTT,
         });
 
         utils.discover.getSongs.ai.setData(
           {
             text: searchValue,
-            first: resultsQtt,
+            first: ai.resQtt,
           },
           (oldData) => {
-            if (resultsQtt === DEFAULT_RESULTS_QTT && data) {
+            if (ai.resQtt === DEFAULT_RESULTS_QTT && data) {
               dispatch({
                 type: "SAVE_SONGS",
                 songs: [...formatTracksForSongsList(data)],
               });
+
               return data;
             }
             if (prevData && oldData) {
@@ -134,6 +128,7 @@ const Ai = () => {
                 type: "SAVE_SONGS",
                 songs: [...formatTracksForSongsList(oldData)],
               });
+
               return oldData;
             }
           }
@@ -144,21 +139,35 @@ const Ai = () => {
 
   useEffect(() => {
     if (isFetched) {
-      const main = document.getElementsByTagName("main");
-      main[0] && main[0].scrollTo({ top: main[0].scrollHeight });
-
-      setLoadingMore(false);
+      dispatch({ type: "STOP_LOADING_MORE_SIMILAR" });
+      const prevData = utils.discover.getSongs.ai.getData({
+        text: searchValue,
+        first: ai.resQtt - DEFAULT_RESULTS_QTT,
+      });
+      console.log("prevData", prevData);
+      if (prevData && ai.forwardLoadingMore) {
+        console.log("ISFETCHED, dispatching", prevData);
+        dispatch({
+          type: "SELECT_SONG",
+          forwardLoadingMore: false,
+          songPos: prevData.length - 1,
+          position: "next",
+          trackReady: true,
+          loadingMore: false,
+        });
+      }
     }
-  }, [isFetched, loadingMore]);
+  }, [isFetched, ai.loadingMore]);
 
   const updateFn = useCallback(() => {
-    setResultsPage(resultsPage + 1);
-    setResultsQtt((resultsPage + 1) * DEFAULT_RESULTS_QTT);
-    setLoadingMore(true);
-  }, [resultsPage, loadingMore]);
+    dispatch({
+      type: "SHOW_MORE_SIMILAR",
+      // resQtt: (ai.resPage + 1) * DEFAULT_RESULTS_QTT,
+    });
+  }, [ai.resPage]);
 
   const [loadMore] = useLoadMore<HTMLUListElement>({
-    loadingMore: loadingMore,
+    loadingMore: ai.loadingMore,
     update: updateFn,
     isFetching,
     isFetched,
@@ -172,16 +181,14 @@ const Ai = () => {
           const { target } = e as Event & { target: HTMLInputElement };
           const text = target.value;
           if (text.trim()) {
-            console.log("text trimmed", text.trim());
             setSearchValue(text.trim());
-            reset();
-            // const songs = await utils.searchAi.getSongs.fetch(text);
+            dispatch({ type: "RESET_SEARCH" });
           }
         }, 800)}
         className="mb-4"
         autoFocus
       />
-      {isFetching && !loadingMore && <ListSkeleton Item={ItemSkeleton} />}
+      {isFetching && !ai.loadingMore && <ListSkeleton Item={ItemSkeleton} />}
       {isError && (
         <Alert
           severity="error"
@@ -200,7 +207,7 @@ const Ai = () => {
 
       {recomSongs && recomSongs.length !== 0 && (
         <div className="h-[calc(100%-11rem)] ">
-          {(!isFetching || (isFetching && loadingMore)) && (
+          {(!isFetching || (isFetching && ai.loadingMore)) && (
             <ul
               className={cn(
                 "-mr-4 h-full space-y-2 overflow-y-auto pr-4 pb-3 lg:-mr-12 lg:pr-12",
@@ -215,7 +222,7 @@ const Ai = () => {
               ))}
             </ul>
           )}
-          {isFetching && loadingMore && <ListSkeleton Item={ItemSkeleton} />}
+          {isFetching && ai.loadingMore && <ListSkeleton Item={ItemSkeleton} />}
         </div>
       )}
       {recomSongs && recomSongs.length === 0 && (
