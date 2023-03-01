@@ -1,5 +1,5 @@
 import { debounce } from "lodash";
-import Shell from "@/components/ui/core/shell";
+import Shell, { isCurrent } from "@/components/ui/core/shell";
 import { api } from "@/utils/api";
 import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
 import Image from "next/image";
@@ -34,6 +34,9 @@ import showToast from "@/components/ui/core/notifications";
 import { SkeletonText } from "@/components/ui/skeleton";
 import useLoadMore from "@/utils/hooks/useLoadMore";
 import { Button } from "@/components/ui/core/button";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import TabsList from "@/components/ui/tabsList";
 
 type InitialStateType = {
   searchValue: string;
@@ -125,6 +128,7 @@ const SpotifyItemSkeleton = () => {
 const Similar = () => {
   const [state, dispatch] = useReducer(similarReducer, initialState);
   const { selectedTrackId, spotify } = state;
+  const router = useRouter();
 
   const utils = api.useContext();
 
@@ -252,6 +256,12 @@ const Similar = () => {
 
   return (
     <Shell heading="Discover" subtitle="Find similar songs with AI">
+      <TabsList
+        list={[
+          { href: "/discover/ai", name: "AI" },
+          { href: "/discover/similar", name: "Similar" },
+        ]}
+      />
       <Select
         onOpenChange={(open) =>
           dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open })
@@ -262,7 +272,7 @@ const Similar = () => {
         <div className="relative">
           <Input
             tabIndex={1}
-            className="mb-2"
+            className="mb-2.5"
             placeholder="Search Spotify tracks"
             onKeyDown={(e) => {
               if (e.code === "Enter") {

@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/core/button";
 import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
 import type { SongType } from "@/server/api/routers/discover";
 import useLoadMore from "@/utils/hooks/useLoadMore";
+import Link from "next/link";
+import TabsList from "@/components/ui/tabsList";
 
 const ItemSkeleton = () => {
   return (
@@ -175,6 +177,13 @@ const Ai = () => {
 
   return (
     <Shell heading="Discover" subtitle="Find new songs with AI">
+      <TabsList
+        list={[
+          { href: "/discover/ai", name: "AI" },
+          { href: "/discover/similar", name: "Similar" },
+        ]}
+      />
+
       <Input
         placeholder="I dont know what to listen. What do you recommend"
         onChange={debounce((e) => {
@@ -185,8 +194,7 @@ const Ai = () => {
             dispatch({ type: "RESET_SEARCH" });
           }
         }, 800)}
-        className="mb-4"
-        autoFocus
+        className="mb-2.5"
       />
       {isFetching && !ai.loadingMore && <ListSkeleton Item={ItemSkeleton} />}
       {isError && (

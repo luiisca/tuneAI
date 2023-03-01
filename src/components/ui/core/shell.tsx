@@ -217,7 +217,7 @@ const navigation: NavigationItemType[] = [
   },
 ];
 
-const isCurrent: ({
+export const isCurrent: ({
   item,
   router,
 }: {
@@ -365,7 +365,7 @@ export function ShellMain(props: LayoutProps) {
           <header
             className={cn(
               props.large && "py-8",
-              "mb-4 flex w-full items-center pt-4 md:p-0 lg:mb-10"
+              "mb-4 flex w-full items-center pt-4 md:p-0"
             )}
           >
             {props.HeadingLeftIcon && (
