@@ -25,7 +25,7 @@ import { ListSkeleton, TrackItem } from "./ai";
 import { MusicPlayerContext } from "../_app";
 import { Alert } from "@/components/ui/alert";
 import EmptyScreen from "@/components/ui/core/empty-screen";
-import { CircleSlashed, Music2 } from "lucide-react";
+import { ArrowRight, CircleSlashed, Music2 } from "lucide-react";
 import { SongType } from "@/server/api/routers/discover";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { formatSongDuration } from "@/utils/song-time";
@@ -33,6 +33,7 @@ import { cn } from "@/utils/cn";
 import showToast from "@/components/ui/core/notifications";
 import { SkeletonText } from "@/components/ui/skeleton";
 import useLoadMore from "@/utils/hooks/useLoadMore";
+import { Button } from "@/components/ui/core/button";
 
 type InitialStateType = {
   searchValue: string;
@@ -258,18 +259,34 @@ const Similar = () => {
         open={spotify.listOpen}
         onValueChange={(value) => dispatch({ type: "SELECT_TRACK_ID", value })}
       >
-        <Input
-          tabIndex={1}
-          className="mb-2"
-          autoFocus
-          placeholder="Search Spotify tracks"
-          onChange={debounce((e) => {
-            const { target } = e as Event & { target: HTMLInputElement };
-            const text = target.value.trim();
-            dispatch({ type: "RESET_SEARCH", searchValue: text });
-            dispatchPlayer({ type: "RESET_SEARCH" });
-          }, 800)}
-        />
+        <div className="relative">
+          <Input
+            tabIndex={1}
+            className="mb-2"
+            placeholder="Search Spotify tracks"
+            onKeyDown={(e) => {
+              if (e.code === "Enter") {
+                dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
+              }
+            }}
+            onChange={debounce((e) => {
+              const { target } = e as Event & { target: HTMLInputElement };
+              const text = target.value.trim();
+              dispatch({ type: "RESET_SEARCH", searchValue: text });
+              dispatchPlayer({ type: "RESET_SEARCH" });
+            }, 800)}
+          />
+          <Button
+            size="sm"
+            variant="subtle"
+            onClick={() => {
+              dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
+            }}
+            className="absolute right-1 top-1 h-8 w-8"
+          >
+            <ArrowRight />
+          </Button>
+        </div>
         <SelectTrigger className="h-0 border-0 p-0 opacity-0">
           <SelectValue />
         </SelectTrigger>
