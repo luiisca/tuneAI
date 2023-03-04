@@ -2,12 +2,17 @@ import { Input } from "@/components/ui/core/input";
 import Shell from "@/components/ui/core/shell";
 import { api } from "@/utils/api";
 import { debounce } from "lodash";
-import { useCallback, useContext, useEffect, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type UIEvent,
+} from "react";
 
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import { CircleSlashed, Music2 } from "lucide-react";
 import { SkeletonContainer, SkeletonText } from "@/components/ui/skeleton";
-import { Alert } from "@/components/ui/alert";
 import { FavouriteBttn, MusicPlayerContext, ScanSimilarsBttn } from "../_app";
 import { cn } from "@/utils/cn";
 import showToast from "@/components/ui/core/notifications";
@@ -47,7 +52,7 @@ export const ListSkeleton = ({
   return (
     <SkeletonContainer>
       <div className="space-y-2">
-        {Array(DEFAULT_RESULTS_QTT)
+        {Array(DEFAULT_RESULTS_QTT - 10) // -10 to avoid letting the user send more than 1 load more req when bottom reached
           .fill(null)
           .map((_, id) => (
             <Item key={id} />
@@ -173,18 +178,16 @@ const Ai = () => {
     }
   }, [isFetched, ai.loadingMore]);
 
-  const updateFn = useCallback(() => {
-    dispatch({
-      type: "SHOW_MORE_SIMILAR",
-      // resQtt: (ai.resPage + 1) * DEFAULT_RESULTS_QTT,
-    });
-  }, [ai.resPage]);
-
   const [loadMore] = useLoadMore<HTMLUListElement>({
     loadingMore: ai.loadingMore,
-    update: updateFn,
+    update: () =>
+      dispatch({
+        type: "SHOW_MORE_SIMILAR",
+      }),
     isFetching,
     isFetched,
+    allResultsShown: ai.allResultsShown,
+    resPage: ai.resPage,
   });
 
   return (
@@ -227,11 +230,9 @@ const Ai = () => {
                 "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 scrollbar-thumb-rounded-md",
                 "dark:scrollbar-thumb-accent dark:hover:scrollbar-thumb-accentBright"
               )}
-              onScroll={(e) => {
-                if (!ai.allResultsShown) {
-                  loadMore(e);
-                }
-              }}
+              onScroll={debounce((e: UIEvent<HTMLDivElement>) => {
+                loadMore(e);
+              }, 1000)}
             >
               {recomSongs.map((song, index) => (
                 <TrackItem track={song} index={index} key={song.id} />

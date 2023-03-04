@@ -250,6 +250,10 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
 
   // CYANITE ERROR
   if ("errors" in queryRes) {
+    console.log(
+      "INSIDE getAiSimilarSongs: cyanite similar tracks errors",
+      queryRes
+    );
     const error = queryRes.errors[0];
     if (error) {
       if (error.extensions.code === "ERR_INVALID_CURSOR") {
@@ -271,9 +275,15 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
   }
 
   if ("data" in queryRes) {
+    console.log("INSIDE getAiSimilarSongs: cyanite data", queryRes);
     const spotifyTrackRes = queryRes.data.spotifyTrack;
     // CYANITE ERROR
     if ("message" in spotifyTrackRes) {
+      console.log(
+        "INSIDE getAiSimilarSongs: cyanite spotifyTracsRes errors",
+        spotifyTrackRes
+      );
+
       return {
         code: "BAD_REQUEST",
         message: spotifyTrackRes.message,
@@ -281,8 +291,17 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
     }
 
     const similarTracksRes = spotifyTrackRes.similarTracks;
+    console.log(
+      "INSIDE getAiSimilarSongs: cyanite similarTracksRes",
+      similarTracksRes
+    );
     // CYANITE ERROR
     if ("message" in similarTracksRes) {
+      console.log(
+        "INSIDE getAiSimilarSongs: cyanite similarTracksRes errors",
+        similarTracksRes
+      );
+
       return {
         code: similarTracksRes.code,
         message: similarTracksRes.message,
@@ -290,6 +309,10 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
     }
 
     const songs = similarTracksRes.edges.slice(NEW_SONGS_START_INDEX);
+    console.log(
+      "INSIDE getAiSimilarSongs: songs (similarTracksRes.edges)",
+      songs
+    );
     songs.forEach((song) => {
       if (!uniqueSimIds.includes(song.cursor)) {
         uniqueSimIds.push(song.cursor);
@@ -303,9 +326,19 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
     // console.log("SIMILAR SONGS", songs);
     // console.log("UNIQUE songs", uniqueSimSongs);
 
+    console.log(
+      "INSIDE getAiSimilarSongs: slice",
+      "uniqeuSimSongs",
+      uniqueSimSongs
+    );
     return uniqueSimSongs.slice(NEW_SONGS_START_INDEX);
   }
 
+  console.log(
+    "INSIDE getAiSimilarSongs: no data no error",
+    "uniqeuSimSongs",
+    uniqueSimSongs
+  );
   return uniqueSimSongs.slice(NEW_SONGS_START_INDEX);
 };
 

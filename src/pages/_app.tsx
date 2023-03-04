@@ -363,8 +363,13 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
       };
     }
     case "SHOW_MORE_SIMILAR": {
-      console.log("showing more similar");
-      console.log("crr route", state.crrRoute);
+      console.log(
+        "MUSICPLAYER REDUCER: inside SHOW_MORE_SIMILAR case fn",
+        "action object",
+        action
+      );
+      console.log("MUSICPLAYER REDUCER: crr route", state.crrRoute);
+      console.log("MUSICPLAYER REDUCER: state", state);
       return {
         ...state,
         [state.crrRoute]: {

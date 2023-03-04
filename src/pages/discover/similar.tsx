@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
   useCallback,
+  type UIEvent,
 } from "react";
 import {
   Select,
@@ -251,6 +252,7 @@ const Similar = () => {
           },
           () => {
             if (!("message" in data)) {
+              console.log("SIMILAR ONSUCCESS: no Message ", data);
               if (similar.resQtt === DEFAULT_RESULTS_QTT && data) {
                 dispatchPlayer({
                   type: "SAVE_SONGS",
@@ -290,6 +292,7 @@ const Similar = () => {
                 return data;
               }
             }
+            console.log("SIMILAR ONSUCCESS: Message ", data);
             if (data.message === LOADED_MORE_ERROR_MSG) {
               showToast(data.message as string, "success");
               dispatchPlayer({
@@ -313,20 +316,6 @@ const Similar = () => {
     }
   }, [error]);
 
-  const updateFn = useCallback(() => {
-    dispatchPlayer({
-      type: "SHOW_MORE_SIMILAR",
-    });
-  }, [isFetched, isFetching]);
-
-  const [loadMore] = useLoadMore<HTMLUListElement>({
-    loadingMore: similar.loadingMore,
-    update: updateFn,
-    isFetching,
-    isFetched,
-  });
-  console.log("is fetched", isFetching, isFetched);
-
   useEffect(() => {
     const query = router.asPath.split("?")[1];
     if (query?.includes("trackid")) {
@@ -336,7 +325,7 @@ const Similar = () => {
   }, []);
 
   useEffect(() => {
-    if (isFetched) {
+    if (isFetched && !isFetching) {
       dispatchPlayer({ type: "STOP_LOADING_MORE_SIMILAR" });
 
       const prevData = utils.discover.similar.getData({
@@ -354,7 +343,19 @@ const Similar = () => {
         });
       }
     }
-  }, [isFetched, similar.loadingMore]);
+  }, [isFetched, isFetching]);
+
+  const [loadMore] = useLoadMore({
+    loadingMore: similar.loadingMore,
+    update: () =>
+      dispatchPlayer({
+        type: "SHOW_MORE_SIMILAR",
+      }),
+    isFetching,
+    isFetched,
+    allResultsShown: similar.allResultsShown,
+    resPage: similar.resPage,
+  });
 
   return (
     <Shell heading="Discover" subtitle="Find similar songs with AI">
@@ -503,11 +504,9 @@ const Similar = () => {
                 "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-rounded-md",
                 "scrollbar-thumb-accent hover:scrollbar-thumb-accentBright"
               )}
-              onScroll={(e) => {
-                if (!similar.allResultsShown) {
-                  loadMore(e);
-                }
-              }}
+              onScroll={debounce((e: UIEvent<HTMLUListElement>) => {
+                loadMore(e);
+              }, 1000)}
             >
               {tracks.map((track, index) => (
                 // index + 1 because of extra song added to the start of songsList
@@ -623,17 +622,17 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
     update: updateFn,
     isFetching,
     isFetched,
+    allResultsShown: spotify.allResultsShown,
+    resPage: resPage,
   });
 
   return (
     <SelectViewport
       className="p-1"
       ref={tracksListRef}
-      onScroll={(e) => {
-        if (!spotify.allResultsShown) {
-          loadMore(e);
-        }
-      }}
+      onScroll={debounce((e: UIEvent<HTMLDivElement>) => {
+        loadMore(e);
+      }, 1000)}
     >
       <SelectItem value="loading" className="h-0 p-0 opacity-0">
         Loading
