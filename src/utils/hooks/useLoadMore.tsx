@@ -13,6 +13,7 @@ const useLoadMore = <T extends HTMLElement>({
   isFetched: boolean;
 }) => {
   let interval = useRef<ReturnType<typeof setInterval> | null>(null);
+  console.log("inside useload more", "isFetched", isFetched);
 
   const loadMore = useCallback(
     debounce((e: UIEvent<T>) => {
@@ -43,7 +44,7 @@ const useLoadMore = <T extends HTMLElement>({
         }
       }
     }, 400),
-    [isFetching, loadingMore]
+    [isFetching, isFetched, loadingMore]
   );
 
   return [loadMore] as const;

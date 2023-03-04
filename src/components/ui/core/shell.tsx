@@ -375,7 +375,7 @@ export function ShellMain(props: LayoutProps) {
               {props.heading && (
                 <h1
                   className={cn(
-                    "scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl"
+                    "scroll-m-20 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl"
                   )}
                 >
                   {props.heading}
@@ -447,7 +447,7 @@ function MainContainer({
 
       <div className="flex h-full flex-col px-4 pt-2 lg:py-8 lg:px-12">
         {/* add padding to top for mobile when App Bar is fixed */}
-        <div className="pt-14 sm:hidden" />
+        <div className="pt-10 sm:hidden" />
         {!props.withoutMain ? (
           <ShellMain {...props}>{props.children}</ShellMain>
         ) : (

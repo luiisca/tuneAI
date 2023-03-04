@@ -1,7 +1,6 @@
 import { cn } from "@/utils/cn";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
 
 export const TabsList = ({
   list,
@@ -13,21 +12,19 @@ export const TabsList = ({
 }) => {
   const router = useRouter();
 
-  const [selectedId, setSelectedId] = useState<null | number>(null);
-  useEffect(() => {
-    setSelectedId(list.findIndex((item) => router.pathname === item.href));
-  }, [router.pathname]);
-
   return (
     <div className="mb-2.5 inline-flex w-min items-center justify-center rounded-md bg-slate-100 p-1 dark:bg-slate-800">
       {list.map((item, crrId) => (
         <Tab
+          key={crrId}
           {...item}
           slideFrom={
             // @TODO: extend for more than 2 tabs
             crrId === 0 ? "right" : "left"
           }
-          selected={crrId === selectedId}
+          selected={
+            crrId === list.findIndex((item) => router.pathname === item.href)
+          }
         />
       ))}
     </div>
@@ -49,7 +46,7 @@ export const Tab = ({
     <Link href={href}>
       <button
         className={cn(
-          "relative inline-flex min-w-[100px] items-center justify-center px-3 py-1.5  transition-all disabled:pointer-events-none disabled:opacity-50"
+          "relative inline-flex min-w-[80px] items-center justify-center px-3 py-1.5 transition-all  disabled:pointer-events-none disabled:opacity-50 sm:min-w-[100px]"
         )}
       >
         <div

@@ -1,5 +1,7 @@
 import { createTRPCRouter } from "./trpc";
 import { discoverRouter } from "./routers/discover";
+import { spotifyRouter } from "./routers/spotify";
+
 import { userRouter } from "./routers/user";
 
 /**
@@ -9,6 +11,7 @@ import { userRouter } from "./routers/user";
  */
 export const appRouter = createTRPCRouter({
   discover: discoverRouter,
+  spotify: spotifyRouter,
   user: userRouter,
 });
 

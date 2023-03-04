@@ -14,14 +14,12 @@ import showToast from "@/components/ui/core/notifications";
 import Image from "next/image";
 import { formatSongDuration } from "@/utils/song-time";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
-import { Button } from "@/components/ui/core/button";
-import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
+import { DEFAULT_RESULTS_QTT, LOADED_MORE_ERROR_MSG } from "@/utils/constants";
 import type { SongType } from "@/server/api/routers/discover";
 import useLoadMore from "@/utils/hooks/useLoadMore";
-import Link from "next/link";
 import TabsList from "@/components/ui/tabsList";
 
-const ItemSkeleton = () => {
+export const ItemSkeleton = ({ time = true }: { time: boolean }) => {
   return (
     <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 px-4 dark:bg-slate-900">
       <div className="flex h-full w-full items-center space-x-4">
@@ -37,7 +35,7 @@ const ItemSkeleton = () => {
         </div>
       </div>
       {/* time */}
-      <SkeletonText className="my-auto h-1/3 w-[4ch]" />
+      {time && <SkeletonText className="my-auto h-1/3 w-[4ch]" />}
     </div>
   );
 };
@@ -74,7 +72,7 @@ const Ai = () => {
     isFetched,
     isError,
     error,
-  } = api.discover.getSongs.ai.useQuery(
+  } = api.discover.ai.useQuery<SongType[], SongType[]>(
     { text: searchValue.trim(), first: ai.resQtt },
     {
       enabled: !!searchValue.trim() && !!ai.resQtt,
@@ -97,42 +95,56 @@ const Ai = () => {
             audioSrc: track.previewUrl || "",
           }));
         };
-        const prevData = utils.discover.getSongs.ai.getData({
+        const prevData = utils.discover.ai.getData({
           text: searchValue,
           first: ai.resQtt - DEFAULT_RESULTS_QTT,
-        });
+        }) as SongType[];
 
-        utils.discover.getSongs.ai.setData(
+        utils.discover.ai.setData(
           {
             text: searchValue,
             first: ai.resQtt,
           },
-          (oldData) => {
-            if (ai.resQtt === DEFAULT_RESULTS_QTT && data) {
+          () => {
+            if (!("message" in data)) {
+              if (ai.resQtt === DEFAULT_RESULTS_QTT && data) {
+                dispatch({
+                  type: "SAVE_SONGS",
+                  songs: [...formatTracksForSongsList(data)],
+                });
+
+                return data;
+              }
+              if (prevData && data) {
+                dispatch({
+                  type: "SAVE_SONGS",
+                  songs: [...songsList!, ...formatTracksForSongsList(data)],
+                });
+
+                return [...prevData, ...data];
+              }
+
+              if (data) {
+                dispatch({
+                  type: "SAVE_SONGS",
+                  songs: [...formatTracksForSongsList(data)],
+                });
+
+                return data;
+              }
+            }
+            if (data.message === LOADED_MORE_ERROR_MSG) {
+              showToast(data.message as string, "success");
               dispatch({
-                type: "SAVE_SONGS",
-                songs: [...formatTracksForSongsList(data)],
+                type: "ALL_RESULTS_SHOWN",
               });
 
-              return data;
-            }
-            if (prevData && oldData) {
-              dispatch({
-                type: "SAVE_SONGS",
-                songs: [...songsList!, ...formatTracksForSongsList(oldData)],
-              });
-
-              return [...prevData, ...oldData];
+              return prevData;
             }
 
-            if (oldData) {
-              dispatch({
-                type: "SAVE_SONGS",
-                songs: [...formatTracksForSongsList(oldData)],
-              });
+            showToast(data.message as string, "error");
 
-              return oldData;
-            }
+            return prevData;
           }
         );
       },
@@ -142,10 +154,10 @@ const Ai = () => {
   useEffect(() => {
     if (isFetched) {
       dispatch({ type: "STOP_LOADING_MORE_SIMILAR" });
-      const prevData = utils.discover.getSongs.ai.getData({
+      const prevData = utils.discover.ai.getData({
         text: searchValue,
         first: ai.resQtt - DEFAULT_RESULTS_QTT,
-      });
+      }) as SongType[];
       console.log("prevData", prevData);
       if (prevData && ai.forwardLoadingMore) {
         console.log("ISFETCHED, dispatching", prevData);
@@ -197,14 +209,6 @@ const Ai = () => {
         className="mb-2.5"
       />
       {isFetching && !ai.loadingMore && <ListSkeleton Item={ItemSkeleton} />}
-      {isError && (
-        <Alert
-          severity="error"
-          title="Something went wrong"
-          className="mb-2"
-          message={error.message}
-        />
-      )}
       {!recomSongs && !isFetching && (
         <EmptyScreen
           Icon={() => <Music2 />}
@@ -223,14 +227,20 @@ const Ai = () => {
                 "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 scrollbar-thumb-rounded-md",
                 "dark:scrollbar-thumb-accent dark:hover:scrollbar-thumb-accentBright"
               )}
-              onScroll={(e) => loadMore(e)}
+              onScroll={(e) => {
+                if (!ai.allResultsShown) {
+                  loadMore(e);
+                }
+              }}
             >
               {recomSongs.map((song, index) => (
                 <TrackItem track={song} index={index} key={song.id} />
               ))}
+              {isFetching && ai.loadingMore && (
+                <ListSkeleton Item={ItemSkeleton} />
+              )}
             </ul>
           )}
-          {isFetching && ai.loadingMore && <ListSkeleton Item={ItemSkeleton} />}
         </div>
       )}
       {recomSongs && recomSongs.length === 0 && (
@@ -247,8 +257,10 @@ const Ai = () => {
 export const TrackItem = ({
   index,
   track,
+  similarList = false,
 }: {
   index: number;
+  similarList?: boolean;
   track:
     | SongType
     | Omit<SongType, "genres" | "moods" | "instruments" | "musicalEra">;
@@ -277,7 +289,7 @@ export const TrackItem = ({
     >
       <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
         <span className="flex w-4 shrink-0  items-center justify-center font-semibold">
-          {index + 1}
+          {similarList ? index : index + 1}
         </span>
         <div className="relative h-10 w-10 shrink-0">
           <Image

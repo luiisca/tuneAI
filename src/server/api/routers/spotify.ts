@@ -1,6 +1,5 @@
 import { env } from "@/env/server.mjs";
 import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, createTRPCRouter } from "../trpc";
 import { getAccessToken } from "../utils";
@@ -18,18 +17,22 @@ const getSpotifyTrack = async (trackId: string, refreshToken: string) => {
     | SpotifyApi.ErrorObject;
   console.log("single track data", data);
 
+  // SPOTIFY ERROR
   if ("message" in data) {
-    throw new TRPCError({
+    return {
       code: "NOT_FOUND",
       message: data.message,
-    });
+    };
   }
 
   return {
     id: data.id,
+    position: 0,
+    favourite: false,
+    scanning: false,
+    audioSrc: data.preview_url,
     title: data.name,
     artists: data.artists.map((artist) => artist.name),
-    previewUrl: data.preview_url,
     duration: data.duration_ms / 1000,
     coverUrl:
       data?.album?.images[0]?.url ||
@@ -59,7 +62,17 @@ const getSpotifySearchResults = async (
       },
     }
   );
-  const data = (await res.json()) as SpotifyApi.TrackSearchResponse;
+  const data = (await res.json()) as
+    | SpotifyApi.TrackSearchResponse
+    | SpotifyApi.ErrorObject;
+
+  // SPOTIFY ERROR
+  if ("message" in data) {
+    return {
+      code: "NOT_FOUND",
+      message: data.message,
+    };
+  }
 
   return data.tracks;
 };
@@ -74,6 +87,7 @@ export const spotifyRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { session } = ctx;
       const { trackId } = input;
+
       return await getSpotifyTrack(trackId, session.accessToken);
     }),
   tracksList: protectedProcedure
@@ -87,23 +101,28 @@ export const spotifyRouter = createTRPCRouter({
       const { session } = ctx;
       const { trackName, offset } = input;
       if (session) {
-        const tracks = (await getSpotifySearchResults(
+        const tracks = await getSpotifySearchResults(
           trackName,
           offset,
           session.accessToken
-        )) as unknown as SpotifyApi.PagingObject<SpotifyApi.TrackObjectFull>;
+        );
+        if ("message" in tracks) {
+          return tracks;
+        }
 
         return tracks.items.map((track) => ({
           id: track.id,
+          title: track.name,
+          artists: track.artists.map((artist) => artist.name),
+          previewUrl: track.preview_url,
           duration: track.duration_ms / 1000,
           coverUrl:
             track.album.images[0]?.url ||
             track.album.images[1]?.url ||
             "/defaultSongCover.jpeg",
-          previewUrl: track.preview_url,
-          title: track.name,
-          artists: track.artists.map((artist) => artist.name),
         }));
       }
+
+      return [];
     }),
 });

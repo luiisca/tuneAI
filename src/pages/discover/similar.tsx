@@ -1,7 +1,7 @@
 import { debounce } from "lodash";
-import Shell, { isCurrent } from "@/components/ui/core/shell";
+import Shell from "@/components/ui/core/shell";
 import { api } from "@/utils/api";
-import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
+import { DEFAULT_RESULTS_QTT, LOADED_MORE_ERROR_MSG } from "@/utils/constants";
 import Image from "next/image";
 import {
   useContext,
@@ -21,39 +21,45 @@ import {
 } from "@/components/ui/core/select";
 import { Input } from "@/components/ui/core/input";
 // import { MusicPlayerContext } from "../_app";
-import { ListSkeleton, TrackItem } from "./ai";
-import { MusicPlayerContext } from "../_app";
-import { Alert } from "@/components/ui/alert";
+import { ItemSkeleton, ListSkeleton, TrackItem } from "./ai";
+import { MusicPlayerContext, PlayerSong } from "../_app";
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import { ArrowRight, CircleSlashed, Music2 } from "lucide-react";
 import { SongType } from "@/server/api/routers/discover";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { formatSongDuration } from "@/utils/song-time";
 import { cn } from "@/utils/cn";
-import showToast from "@/components/ui/core/notifications";
-import { SkeletonText } from "@/components/ui/skeleton";
+import { SkeletonContainer, SkeletonText } from "@/components/ui/skeleton";
 import useLoadMore from "@/utils/hooks/useLoadMore";
 import { Button } from "@/components/ui/core/button";
-import Link from "next/link";
 import { useRouter } from "next/router";
 import TabsList from "@/components/ui/tabsList";
+import showToast from "@/components/ui/core/notifications";
 
+type SpotifyTrackResultType = Omit<
+  SongType,
+  "genres" | "moods" | "instruments" | "musicalEra"
+>;
 type InitialStateType = {
   searchValue: string;
-  selectedTrackId: null | string;
+  selectedTrackId: string;
+  selectedTrack: null | PlayerSong;
   spotify: {
     listOpen: boolean;
     resQtt: number;
     loadingMore: boolean;
+    allResultsShown: boolean;
   };
 };
 const initialState: InitialStateType = {
   searchValue: "",
-  selectedTrackId: null,
+  selectedTrackId: "",
+  selectedTrack: null,
   spotify: {
     listOpen: false,
     resQtt: DEFAULT_RESULTS_QTT,
     loadingMore: false,
+    allResultsShown: false,
   },
 };
 type ACTIONTYPE =
@@ -68,6 +74,10 @@ type ACTIONTYPE =
   | {
       type: "RESET_SEARCH";
       searchValue: string;
+    }
+  | {
+      type: "SELECT_TRACK";
+      track: PlayerSong | null;
     };
 
 const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
@@ -99,6 +109,12 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
         },
       };
     }
+    case "SELECT_TRACK": {
+      return {
+        ...state,
+        selectedTrack: action.track,
+      };
+    }
 
     default: {
       return state;
@@ -127,7 +143,7 @@ const SpotifyItemSkeleton = () => {
 
 const Similar = () => {
   const [state, dispatch] = useReducer(similarReducer, initialState);
-  const { selectedTrackId, spotify } = state;
+  const { selectedTrackId, selectedTrack, spotify } = state;
   const router = useRouter();
 
   const utils = api.useContext();
@@ -137,27 +153,83 @@ const Similar = () => {
     dispatch: dispatchPlayer,
   } = useContext(MusicPlayerContext);
 
+  const { isFetching: spotifyTrackIsFetching } =
+    api.spotify.singleTrack.useQuery(
+      {
+        trackId: selectedTrackId,
+      },
+      {
+        enabled: !!selectedTrackId,
+        keepPreviousData: true,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false,
+        onSuccess: (data) => {
+          if (data) {
+            if ("message" in data) {
+              dispatch({
+                type: "SELECT_TRACK",
+                track: null,
+              });
+              if (songsList && songsList[0]) {
+                dispatchPlayer({
+                  type: "SAVE_SONGS",
+                  songs: [
+                    {
+                      ...songsList[0],
+                      // little hack to ensure prev song cannot be played
+                      audioSrc: null,
+                    },
+                    ...songsList,
+                  ],
+                });
+              }
+            } else {
+              dispatch({
+                type: "SELECT_TRACK",
+                track: data,
+              });
+              if (songsList) {
+                dispatchPlayer({
+                  type: "SAVE_SONGS",
+                  songs: [data, ...songsList],
+                });
+              }
+            }
+          }
+        },
+      }
+    );
+
   const {
     data: tracks,
     isFetching,
     isFetched,
     isError,
     error,
-  } = api.discover.getSongs.similar.useQuery(
+  } = api.discover.similar.useQuery<SongType[], SongType[]>(
     {
-      trackId: selectedTrackId as string,
+      trackId: selectedTrack?.id as string,
       first: similar.resQtt,
     },
     {
-      enabled: !!selectedTrackId && !!similar.resPage,
+      enabled: !!selectedTrack?.id && !!similar.resPage,
       keepPreviousData: true,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
+      retry: (failureCount, error) => {
+        if (error.message === LOADED_MORE_ERROR_MSG || failureCount >= 3) {
+          return false;
+        }
+
+        return true;
+      },
       onSuccess: (data) => {
         const formatTracksForSongsList = (tracks: SongType[]) => {
           return tracks.map((track, index: number) => ({
-            position: (songsList?.length || 0) + index,
+            // index + 1 because of extra song added to the start of songsList
+            position: (songsList?.length || 0) + index + 1,
             id: track.id,
             title: track.title,
             artists: track.artists,
@@ -167,54 +239,85 @@ const Similar = () => {
             audioSrc: track.previewUrl || "",
           }));
         };
-        const prevData = utils.discover.getSongs.similar.getData({
-          trackId: selectedTrackId as string,
+        const prevData = utils.discover.similar.getData({
+          trackId: selectedTrack?.id as string,
           first: similar.resQtt - DEFAULT_RESULTS_QTT,
-        });
+        }) as SongType[];
 
-        utils.discover.getSongs.similar.setData(
+        utils.discover.similar.setData(
           {
-            trackId: selectedTrackId as string,
+            trackId: selectedTrack?.id as string,
             first: similar.resQtt,
           },
-          (oldData) => {
-            // first load, there are no prevData
-            if (similar.resQtt === DEFAULT_RESULTS_QTT && data) {
+          () => {
+            if (!("message" in data)) {
+              if (similar.resQtt === DEFAULT_RESULTS_QTT && data) {
+                dispatchPlayer({
+                  type: "SAVE_SONGS",
+                  songs:
+                    selectedTrack && similar.resPage === 1
+                      ? [selectedTrack, ...formatTracksForSongsList(data)]
+                      : [...formatTracksForSongsList(data)],
+                });
+
+                return data;
+              }
+              if (prevData && data) {
+                dispatchPlayer({
+                  type: "SAVE_SONGS",
+                  songs:
+                    selectedTrack && similar.resPage === 1
+                      ? [
+                          selectedTrack,
+                          ...songsList!,
+                          ...formatTracksForSongsList(data),
+                        ]
+                      : [...songsList!, ...formatTracksForSongsList(data)],
+                });
+
+                return [...prevData, ...data];
+              }
+
+              if (data) {
+                dispatchPlayer({
+                  type: "SAVE_SONGS",
+                  songs:
+                    selectedTrack && similar.resPage === 1
+                      ? [selectedTrack, ...formatTracksForSongsList(data)]
+                      : [...formatTracksForSongsList(data)],
+                });
+
+                return data;
+              }
+            }
+            if (data.message === LOADED_MORE_ERROR_MSG) {
+              showToast(data.message as string, "success");
               dispatchPlayer({
-                type: "SAVE_SONGS",
-                songs: [...formatTracksForSongsList(data)],
+                type: "ALL_RESULTS_SHOWN",
               });
 
-              return data;
-            }
-            if (prevData && oldData) {
-              dispatchPlayer({
-                type: "SAVE_SONGS",
-                songs: [...songsList!, ...formatTracksForSongsList(oldData)],
-              });
-
-              return [...prevData, ...oldData];
+              return prevData;
             }
 
-            if (oldData) {
-              dispatchPlayer({
-                type: "SAVE_SONGS",
-                songs: [...formatTracksForSongsList(oldData)],
-              });
+            showToast(data.message as string, "error");
 
-              return oldData;
-            }
+            return prevData;
           }
         );
       },
     }
   );
+  useEffect(() => {
+    if (isError) {
+      showToast(error.message, "error");
+    }
+  }, [error]);
 
   const updateFn = useCallback(() => {
     dispatchPlayer({
       type: "SHOW_MORE_SIMILAR",
     });
-  }, []);
+  }, [isFetched, isFetching]);
 
   const [loadMore] = useLoadMore<HTMLUListElement>({
     loadingMore: similar.loadingMore,
@@ -222,26 +325,25 @@ const Similar = () => {
     isFetching,
     isFetched,
   });
+  console.log("is fetched", isFetching, isFetched);
 
   useEffect(() => {
-    console.log(
-      "isFetched",
-      isFetched,
-      "simlar loadinMroe",
-      similar.loadingMore,
-      "loading more",
-      similar.loadingMore
-    );
+    const query = router.asPath.split("?")[1];
+    if (query?.includes("trackid")) {
+      const trackId = new URLSearchParams(query).get("trackid");
+      dispatch({ type: "SELECT_TRACK_ID", value: trackId! });
+    }
+  }, []);
+
+  useEffect(() => {
     if (isFetched) {
       dispatchPlayer({ type: "STOP_LOADING_MORE_SIMILAR" });
 
-      const prevData = utils.discover.getSongs.similar.getData({
-        trackId: selectedTrackId as string,
+      const prevData = utils.discover.similar.getData({
+        trackId: selectedTrack?.id as string,
         first: similar.resQtt - DEFAULT_RESULTS_QTT,
-      });
-      console.log("prevData", prevData);
+      }) as SongType[];
       if (prevData && similar.forwardLoadingMore) {
-        console.log("ISFETCHED, dispatching", prevData);
         dispatchPlayer({
           type: "SELECT_SONG",
           forwardLoadingMore: false,
@@ -256,6 +358,61 @@ const Similar = () => {
 
   return (
     <Shell heading="Discover" subtitle="Find similar songs with AI">
+      <div
+        className={cn(
+          "absolute right-0 top-16 flex min-h-min w-1/2 items-center justify-center rounded-l-xl bg-slate-800 shadow-slate-400 animate-in sm:top-24 md:top-0 md:rounded-t-none",
+          spotifyTrackIsFetching && "slide-in-from-right"
+        )}
+      >
+        {spotifyTrackIsFetching && (
+          <SkeletonContainer>
+            <ItemSkeleton time={false} />
+          </SkeletonContainer>
+        )}
+        {selectedTrack && (
+          <div
+            onClick={(e) => {
+              const target = e.target as HTMLDivElement;
+              if (!target.closest("button")) {
+                if (selectedTrack.audioSrc) {
+                  dispatchPlayer({
+                    type: "SELECT_SONG",
+                    songPos: 0,
+                  });
+                } else {
+                  showToast("Cannot play. Sorry", "error");
+                }
+              }
+            }}
+            className={cn(
+              "group flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4 hover:bg-slate-100 dark:hover:bg-slate-700",
+              !selectedTrack.audioSrc && "cursor-not-allowed opacity-40"
+            )}
+          >
+            <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
+              <div className="relative h-14 w-14 shrink-0">
+                <Image
+                  alt={`${selectedTrack.title} playing`}
+                  fill
+                  placeholder="blur"
+                  blurDataURL={`data:image/svg+xml;base64,${toBase64(
+                    shimmer(700, 475)
+                  )}`}
+                  sizes="20vw"
+                  src={selectedTrack.coverUrl || "/defaultSongCover.jpeg"}
+                  className="object-cover"
+                />
+              </div>
+              <div className="overflow-hidden">
+                <p className="truncate">{selectedTrack.title}</p>
+                <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+                  {selectedTrack.artists[0]}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
       <TabsList
         list={[
           { href: "/discover/ai", name: "AI" },
@@ -267,7 +424,25 @@ const Similar = () => {
           dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open })
         }
         open={spotify.listOpen}
-        onValueChange={(value) => dispatch({ type: "SELECT_TRACK_ID", value })}
+        onValueChange={(value) => {
+          const track = JSON.parse(value) as SpotifyTrackResultType;
+          router.replace({
+            pathname: router.pathname,
+            query: {
+              trackid: track.id,
+            },
+          });
+          dispatch({
+            type: "SELECT_TRACK",
+            track: {
+              ...track,
+              position: 0,
+              favourite: false,
+              scanning: false,
+              audioSrc: track.previewUrl,
+            },
+          });
+        }}
       >
         <div className="relative">
           <Input
@@ -282,6 +457,7 @@ const Similar = () => {
             onChange={debounce((e) => {
               const { target } = e as Event & { target: HTMLInputElement };
               const text = target.value.trim();
+
               dispatch({ type: "RESET_SEARCH", searchValue: text });
               dispatchPlayer({ type: "RESET_SEARCH" });
             }, 800)}
@@ -309,14 +485,6 @@ const Similar = () => {
       </Select>
 
       {isFetching && !similar.loadingMore && <ListSkeleton />}
-      {isError && (
-        <Alert
-          severity="error"
-          title="Something went wrong"
-          className="mb-2"
-          message={error.message}
-        />
-      )}
       {!tracks && !isFetching && (
         <EmptyScreen
           Icon={() => <Music2 />}
@@ -326,6 +494,7 @@ const Similar = () => {
       )}
       {tracks && tracks.length !== 0 && (
         <div className="h-[calc(100%-11rem)] ">
+          {/* @TODO: take a look at this condition, might be unncessary */}
           {(!isFetching || (isFetching && similar.loadingMore)) && (
             <ul
               className={cn(
@@ -334,10 +503,20 @@ const Similar = () => {
                 "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-rounded-md",
                 "scrollbar-thumb-accent hover:scrollbar-thumb-accentBright"
               )}
-              onScroll={(e) => loadMore(e)}
+              onScroll={(e) => {
+                if (!similar.allResultsShown) {
+                  loadMore(e);
+                }
+              }}
             >
               {tracks.map((track, index) => (
-                <TrackItem index={index} track={track} key={track.id} />
+                // index + 1 because of extra song added to the start of songsList
+                <TrackItem
+                  index={index + 1}
+                  similarList
+                  track={track}
+                  key={track.id}
+                />
               ))}
               {isFetching && similar.loadingMore && <ListSkeleton />}
             </ul>
@@ -356,10 +535,11 @@ const Similar = () => {
 };
 
 const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
-  const { searchValue } = state;
+  const { searchValue, spotify } = state;
   const tracksListRef = useRef<HTMLDivElement>(null);
   const [resPage, setResPage] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { dispatch: dispatchPlayer } = useContext(MusicPlayerContext);
 
   const utils = api.useContext();
 
@@ -369,7 +549,10 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
     isFetched,
     isError,
     error,
-  } = api.discover.getSongs.spotify.useQuery(
+  } = api.spotify.tracksList.useQuery<
+    SpotifyTrackResultType[],
+    SpotifyTrackResultType[]
+  >(
     {
       trackName: searchValue,
       offset: resPage * DEFAULT_RESULTS_QTT,
@@ -381,32 +564,47 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
       refetchOnReconnect: false,
       refetchOnMount: false,
       onSuccess: (data) => {
-        if (data) {
-          console.log("SPOTI data", data);
-        }
-        const prevData = utils.discover.getSongs.spotify.getData({
+        const prevData = utils.spotify.tracksList.getData({
           trackName: searchValue,
           offset: resPage * DEFAULT_RESULTS_QTT - DEFAULT_RESULTS_QTT,
-        });
-        console.log("PREV data", prevData);
+        }) as unknown as SpotifyTrackResultType[];
 
-        utils.discover.getSongs.spotify.setData(
+        utils.spotify.tracksList.setData(
           {
             trackName: searchValue,
             offset: resPage * DEFAULT_RESULTS_QTT,
           },
-          (oldData) => {
-            console.log("old data", oldData);
-            if (prevData && oldData) {
-              return [...prevData, ...oldData];
+          () => {
+            if (!("message" in data)) {
+              if (prevData && data) {
+                return [...prevData, ...data];
+              }
+
+              return data;
             }
 
-            return oldData;
+            if (data.message === LOADED_MORE_ERROR_MSG) {
+              showToast(data.message as string, "success");
+              dispatchPlayer({
+                type: "ALL_RESULTS_SHOWN",
+              });
+
+              return prevData;
+            }
+
+            showToast(data.message as string, "error");
+
+            return prevData;
           }
         );
       },
     }
   );
+  useEffect(() => {
+    if (isError) {
+      showToast(error.message, "error");
+    }
+  }, [error]);
 
   useEffect(() => {
     if (isFetched) {
@@ -432,7 +630,9 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
       className="p-1"
       ref={tracksListRef}
       onScroll={(e) => {
-        loadMore(e);
+        if (!spotify.allResultsShown) {
+          loadMore(e);
+        }
       }}
     >
       <SelectItem value="loading" className="h-0 p-0 opacity-0">
@@ -443,22 +643,15 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
           <ListSkeleton Item={SpotifyItemSkeleton} />
         )}
 
-        {isError && (
-          <Alert
-            severity="error"
-            title="Something went wrong"
-            className="mb-2"
-            message={error.message}
-          />
-        )}
-
         {tracks && tracks.length !== 0 && (
           <div>
-            {(!isFetching || (isFetching && loadingMore)) && (
+            {(!isFetching ||
+              (isFetching && loadingMore) ||
+              (isError && error?.message === LOADED_MORE_ERROR_MSG)) && (
               <ul className="space-y-2">
-                {tracks.map((track, index) => (
-                  <SelectItem value={track.id} key={track.id}>
-                    <SptifyTrackItem index={index} track={track} />
+                {tracks.map((track) => (
+                  <SelectItem value={JSON.stringify(track)} key={track.id}>
+                    <SpotifyTrackItem track={track} />
                   </SelectItem>
                 ))}
               </ul>
@@ -481,32 +674,13 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
   );
 };
 
-export const SptifyTrackItem = ({
-  index,
+export const SpotifyTrackItem = ({
   track,
 }: {
-  index: number;
-  track:
-    | SongType
-    | Omit<SongType, "genres" | "moods" | "instruments" | "musicalEra">;
+  track: SongType | SpotifyTrackResultType;
 }) => {
-  const { dispatch } = useContext(MusicPlayerContext);
-
   return (
     <li
-      onClick={(e) => {
-        const target = e.target as HTMLLIElement;
-        if (!target.closest("button")) {
-          if (track.previewUrl) {
-            dispatch({
-              type: "SELECT_SONG",
-              songPos: index,
-            });
-          } else {
-            showToast("Cannot play. Sorry", "error");
-          }
-        }
-      }}
       className={cn(
         "group flex h-14 cursor-pointer items-center justify-between rounded-md py-2",
         !track.previewUrl && "cursor-not-allowed opacity-40"

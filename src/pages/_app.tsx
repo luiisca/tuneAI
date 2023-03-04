@@ -100,8 +100,10 @@ type ActionType =
       type: "RESET_SEARCH";
     }
   | {
+      type: "ALL_RESULTS_SHOWN";
+    }
+  | {
       type: "SHOW_MORE_SIMILAR";
-      // resQtt: number;
     }
   | {
       type: "STOP_LOADING_MORE_SIMILAR";
@@ -111,7 +113,7 @@ type ActionType =
       route: (typeof playerPages)[number];
     };
 
-type PlayerSong = {
+export type PlayerSong = {
   position: number;
   id: string;
   title: string;
@@ -119,7 +121,7 @@ type PlayerSong = {
   artists: string[];
   coverUrl: string;
   favourite: boolean;
-  audioSrc: string;
+  audioSrc: string | null;
 };
 const playerPages = ["ai", "similar"] as const;
 type InitStateType = {
@@ -136,12 +138,14 @@ type InitStateType = {
     resPage: number;
     resQtt: number;
     loadingMore: boolean;
+    allResultsShown: boolean;
   };
   ai: {
     forwardLoadingMore: boolean;
     resPage: number;
     resQtt: number;
     loadingMore: boolean;
+    allResultsShown: boolean;
   };
 };
 
@@ -266,13 +270,6 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
 
       const getClosestPlayableSong = () => {
         if (songsList && (next || prev) && !songsList[positionId]?.audioSrc) {
-          console.log("forward clicked");
-          console.log(
-            "positionID",
-            positionId,
-            "songsList length",
-            songsList.length
-          );
           if (next && positionId >= songsList.length) {
             console.log("latest el selected, returning load more");
             return "LOAD_MORE";
@@ -284,11 +281,11 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
           ) {
             console.log("inside for", songsList.length, "index", i);
             if (songsList[i]?.audioSrc) {
-              console.log("audio availabel");
+              console.log("audio available");
               return songsList[i];
             } else if (next && songsList.length - 1 === i) {
               console.log("last item selected");
-              // is the last one ans still no audio, return load more signal
+              // is the last one and theres still is no audio, return load more signal
               return "LOAD_MORE";
             }
           }
@@ -351,11 +348,23 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
           ...state[state.crrRoute as "ai" | "similar"],
           resPage: 1,
           resQtt: DEFAULT_RESULTS_QTT,
+          allResultsShown: false,
         },
       };
     }
 
+    case "ALL_RESULTS_SHOWN": {
+      return {
+        ...state,
+        [state.crrRoute]: {
+          ...[state.crrRoute],
+          allResultsShown: true,
+        },
+      };
+    }
     case "SHOW_MORE_SIMILAR": {
+      console.log("showing more similar");
+      console.log("crr route", state.crrRoute);
       return {
         ...state,
         [state.crrRoute]: {
@@ -397,12 +406,14 @@ const musicPlayerInitState: InitStateType = {
     resPage: 1,
     resQtt: DEFAULT_RESULTS_QTT,
     loadingMore: false,
+    allResultsShown: false,
   },
   ai: {
     forwardLoadingMore: false,
     resPage: 1,
     resQtt: DEFAULT_RESULTS_QTT,
     loadingMore: false,
+    allResultsShown: false,
   },
 };
 

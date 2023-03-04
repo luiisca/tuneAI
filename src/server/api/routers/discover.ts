@@ -108,26 +108,34 @@ interface SearchSongsResult {
   };
 }
 
-interface SearchSimilarSongsResult {
-  data: {
-    spotifyTrack:
-      | {
+type SearchSimilarSongsResult =
+  | {
+      errors: Record<string, string> &
+        {
           message: string;
-        }
-      | {
-          id: string;
-          title: string;
-          similarTracks:
-            | {
-                edges: SongResult[];
-              }
-            | {
-                code: string;
-                message: string;
-              };
-        };
-  };
-}
+          extensions: { code: string | "ERR_INVALID_CURSOR" };
+        }[];
+    }
+  | {
+      data: {
+        spotifyTrack:
+          | {
+              message: string;
+            }
+          | {
+              id: string;
+              title: string;
+              similarTracks:
+                | {
+                    edges: SongResult[];
+                  }
+                | {
+                    code: string;
+                    message: string;
+                  };
+            };
+      };
+    };
 
 interface enqueuedSpotifyTrack {
   data: {
@@ -238,23 +246,20 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
     },
   });
   const queryRes = (await res.json()) as SearchSimilarSongsResult;
+  console.log("similar cyanite res", queryRes);
 
-  const spotifyTrackRes = queryRes.data.spotifyTrack;
-  // ERROR
-  if ("message" in spotifyTrackRes) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: spotifyTrackRes.message,
-    });
-  }
-
-  const similarTracksRes = spotifyTrackRes.similarTracks;
-  // ERROR
-  if ("message" in similarTracksRes) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: similarTracksRes.message,
-    });
+  // CYANITE ERROR
+  if ("errors" in queryRes) {
+    const error = queryRes.errors[0];
+    if (error) {
+      if (error.extensions.code === "ERR_INVALID_CURSOR") {
+        return {
+          code: "NOT_FOUND",
+          message: "All results shown",
+        };
+      }
+      return { code: "CONFLICT", message: error.message };
+    }
   }
 
   const NEW_SONGS_START_INDEX =
@@ -264,21 +269,42 @@ const getAiSimilarSongs = async (trackId: string, first: number) => {
     uniqueSimIds = [];
     uniqueSimSongs = [];
   }
-  console.log("ai similar songs response", similarTracksRes);
 
-  const songs = similarTracksRes.edges.slice(NEW_SONGS_START_INDEX);
-  songs.forEach((song) => {
-    if (!uniqueSimIds.includes(song.cursor)) {
-      uniqueSimIds.push(song.cursor);
-      uniqueSimSongs.push(song);
-
-      return;
+  if ("data" in queryRes) {
+    const spotifyTrackRes = queryRes.data.spotifyTrack;
+    // CYANITE ERROR
+    if ("message" in spotifyTrackRes) {
+      return {
+        code: "BAD_REQUEST",
+        message: spotifyTrackRes.message,
+      };
     }
 
-    uniqueSimSongs.push(null);
-  });
-  console.log("SIMILAR SONGS", songs);
-  console.log("UNIQUE songs", uniqueSimSongs);
+    const similarTracksRes = spotifyTrackRes.similarTracks;
+    // CYANITE ERROR
+    if ("message" in similarTracksRes) {
+      return {
+        code: similarTracksRes.code,
+        message: similarTracksRes.message,
+      };
+    }
+
+    const songs = similarTracksRes.edges.slice(NEW_SONGS_START_INDEX);
+    songs.forEach((song) => {
+      if (!uniqueSimIds.includes(song.cursor)) {
+        uniqueSimIds.push(song.cursor);
+        uniqueSimSongs.push(song);
+
+        return;
+      }
+
+      uniqueSimSongs.push(null);
+    });
+    // console.log("SIMILAR SONGS", songs);
+    // console.log("UNIQUE songs", uniqueSimSongs);
+
+    return uniqueSimSongs.slice(NEW_SONGS_START_INDEX);
+  }
 
   return uniqueSimSongs.slice(NEW_SONGS_START_INDEX);
 };
@@ -303,6 +329,7 @@ const enqueueSpotifyTrackAnalysis = async (trackID: string) => {
 
   const enqueuedSpotifyTrackResult =
     enqueuedSpotifyTrack.data.spotifyTrackEnqueue;
+  console.log("enqueed", enqueuedSpotifyTrackResult);
   if ("message" in enqueuedSpotifyTrackResult) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
@@ -324,8 +351,17 @@ const getSpotifyTracksData = async (tracksId: string, refreshToken: string) => {
       },
     }
   );
-  const data = (await res.json()) as SpotifyApi.MultipleTracksResponse;
-  // console.log("spotify data", data);
+  const data = (await res.json()) as
+    | SpotifyApi.MultipleTracksResponse
+    | SpotifyApi.ErrorObject;
+
+  // SPOTIFY ERROR
+  if ("message" in data) {
+    return {
+      code: "NOT_FOUND",
+      message: data.message,
+    };
+  }
 
   return data.tracks;
 };
@@ -346,12 +382,16 @@ export const discoverRouter = createTRPCRouter({
       if (session) {
         const lastRecomSongs = await getAiRecomSongs(text, first);
         const ids = getIdsString(lastRecomSongs);
-        console.log("IDS", ids);
 
         const spotifyTracks = await getSpotifyTracksData(
           ids,
           session.accessToken
         );
+        // SPOTIFY ERROR
+        if ("message" in spotifyTracks) {
+          return spotifyTracks;
+        }
+
         console.log("SPOTIFY tracks", spotifyTracks);
         songs = spotifyTracks.map((track: SpotifyApi.TrackObjectFull) => {
           const recomSong = lastRecomSongs.find(
@@ -374,9 +414,9 @@ export const discoverRouter = createTRPCRouter({
             artists: track.artists.map((artist) => artist.name),
           };
         });
-
-        return songs;
       }
+
+      return songs;
     }),
   similar: publicProcedure
     .input(
@@ -401,11 +441,10 @@ export const discoverRouter = createTRPCRouter({
         const timeout = now - startingTime >= 30;
 
         if (timeout) {
-          console.log("TIMEOUT", timeout);
-          throw new TRPCError({
+          return {
             code: "TIMEOUT",
             message: "Could not find any similar song. Sorry",
-          });
+          };
         }
 
         if (
@@ -416,44 +455,54 @@ export const discoverRouter = createTRPCRouter({
           await enqueueSpotifyTrackAnalysis(trackId);
 
           recursiveGetAiSimilarSongs();
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Could not find any similar song. Retrying...",
-          });
+
+          return;
         }
 
-        return lastSimSongs as SongResult[];
+        return lastSimSongs;
       };
 
       if (session) {
         const lastSimSongs = await recursiveGetAiSimilarSongs();
-        const ids = getIdsString(lastSimSongs);
 
-        const spotifyTracks = await getSpotifyTracksData(
-          ids,
-          session.accessToken
-        );
-        songs = spotifyTracks.map((track: SpotifyApi.TrackObjectFull) => {
-          const simSong = lastSimSongs.find(
-            (song) => song?.cursor === track.id
+        if (lastSimSongs) {
+          // CYANITE ERROR
+          if ("message" in lastSimSongs) {
+            return lastSimSongs;
+          }
+          const ids = getIdsString(lastSimSongs);
+
+          const spotifyTracks = await getSpotifyTracksData(
+            ids,
+            session.accessToken
           );
+          // SPOTIFY ERROR
+          if ("message" in spotifyTracks) {
+            return spotifyTracks;
+          }
 
-          return {
-            id: simSong!.cursor,
-            genres: simSong!.node.audioAnalysisV6.result.genreTags,
-            moods: simSong!.node.audioAnalysisV6.result.moodTags,
-            instruments: simSong!.node.audioAnalysisV6.result.instrumentTags,
-            musicalEra: simSong!.node.audioAnalysisV6.result.musicalEraTag,
-            duration: track.duration_ms / 1000,
-            coverUrl:
-              track?.album?.images[0]?.url ||
-              track?.album?.images[1]?.url ||
-              "/defaultSongCover.jpeg",
-            previewUrl: track?.preview_url,
-            title: track.name,
-            artists: track.artists.map((artist) => artist.name),
-          };
-        });
+          songs = spotifyTracks.map((track: SpotifyApi.TrackObjectFull) => {
+            const simSong = lastSimSongs.find(
+              (song) => song?.cursor === track.id
+            );
+
+            return {
+              id: simSong!.cursor,
+              genres: simSong!.node.audioAnalysisV6.result.genreTags,
+              moods: simSong!.node.audioAnalysisV6.result.moodTags,
+              instruments: simSong!.node.audioAnalysisV6.result.instrumentTags,
+              musicalEra: simSong!.node.audioAnalysisV6.result.musicalEraTag,
+              duration: track.duration_ms / 1000,
+              coverUrl:
+                track?.album?.images[0]?.url ||
+                track?.album?.images[1]?.url ||
+                "/defaultSongCover.jpeg",
+              previewUrl: track?.preview_url,
+              title: track.name,
+              artists: track.artists.map((artist) => artist.name),
+            };
+          });
+        }
       }
 
       return songs;
