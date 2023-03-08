@@ -23,6 +23,7 @@ import { DEFAULT_RESULTS_QTT, LOADED_MORE_ERROR_MSG } from "@/utils/constants";
 import type { SongType } from "@/server/api/routers/discover";
 import useLoadMore from "@/utils/hooks/useLoadMore";
 import TabsList from "@/components/ui/tabsList";
+import { useRouter } from "next/router";
 
 export const ItemSkeleton = ({ time = true }: { time: boolean }) => {
   return (
@@ -65,6 +66,7 @@ export const ListSkeleton = ({
 const Ai = () => {
   const [searchValue, setSearchValue] = useState("");
   const utils = api.useContext();
+  const router = useRouter();
 
   const {
     state: { songsList, ai },
@@ -75,8 +77,6 @@ const Ai = () => {
     data: recomSongs,
     isFetching,
     isFetched,
-    isError,
-    error,
   } = api.discover.ai.useQuery<SongType[], SongType[]>(
     { text: searchValue.trim(), first: ai.resQtt },
     {
@@ -178,6 +178,14 @@ const Ai = () => {
     }
   }, [isFetched, ai.loadingMore]);
 
+  useEffect(() => {
+    const query = router.asPath.split("?")[1];
+    if (query?.includes("prompt")) {
+      const prompt = new URLSearchParams(query).get("prompt");
+      setSearchValue(prompt!);
+    }
+  }, [router.query.prompt]);
+
   const [loadMore] = useLoadMore<HTMLUListElement>({
     loadingMore: ai.loadingMore,
     update: () =>
@@ -200,6 +208,7 @@ const Ai = () => {
       />
 
       <Input
+        defaultValue={searchValue}
         placeholder="I dont know what to listen. What do you recommend"
         onChange={debounce((e) => {
           const { target } = e as Event & { target: HTMLInputElement };
@@ -208,6 +217,12 @@ const Ai = () => {
             setSearchValue(text.trim());
             dispatch({ type: "RESET_SEARCH" });
           }
+          router.push({
+            pathname: router.pathname,
+            query: {
+              prompt: text.trim(),
+            },
+          });
         }, 800)}
         className="mb-2.5"
       />
@@ -230,7 +245,7 @@ const Ai = () => {
                 "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 scrollbar-thumb-rounded-md",
                 "dark:scrollbar-thumb-accent dark:hover:scrollbar-thumb-accentBright"
               )}
-              onScroll={debounce((e: UIEvent<HTMLDivElement>) => {
+              onScroll={debounce((e: UIEvent<HTMLUListElement>) => {
                 loadMore(e);
               }, 1000)}
             >
