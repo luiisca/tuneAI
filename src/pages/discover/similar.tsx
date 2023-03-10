@@ -36,6 +36,8 @@ import { Button } from "@/components/ui/core/button";
 import { useRouter } from "next/router";
 import TabsList from "@/components/ui/tabsList";
 import showToast from "@/components/ui/core/notifications";
+import Link from "next/link";
+import { Icons } from "@/components/ui/core/icons";
 
 type SpotifyTrackResultType = Omit<
   SongType,
@@ -466,34 +468,48 @@ const Similar = () => {
           });
         }}
       >
-        <div className="relative">
-          <Input
-            tabIndex={1}
-            className="mb-2.5"
-            placeholder="Search Spotify tracks"
-            onKeyDown={(e) => {
-              if (e.code === "Enter") {
-                dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
-              }
-            }}
-            onChange={debounce((e) => {
-              const { target } = e as Event & { target: HTMLInputElement };
-              const text = target.value.trim();
+        <div className="flex space-x-2">
+          <div className="relative w-full">
+            <Input
+              tabIndex={1}
+              className="mb-2.5"
+              placeholder="Search Spotify tracks"
+              onKeyDown={(e) => {
+                if (e.code === "Enter") {
+                  dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
+                }
+              }}
+              onChange={debounce((e) => {
+                const { target } = e as Event & { target: HTMLInputElement };
+                const text = target.value.trim();
 
-              dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
-              dispatch({ type: "RESET_SEARCH", searchValue: text });
-            }, 800)}
-          />
-          <Button
-            size="sm"
-            variant="subtle"
-            onClick={() => {
-              dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
-            }}
-            className="absolute right-1 top-1 h-8 w-8"
+                dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
+                dispatch({ type: "RESET_SEARCH", searchValue: text });
+              }, 800)}
+            />
+            <Button
+              size="sm"
+              variant="subtle"
+              onClick={() => {
+                dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
+              }}
+              className="absolute right-1 top-1 h-8 w-8"
+            >
+              <ArrowRight />
+            </Button>
+          </div>
+          <Link
+            href={`${process.env.NEXT_PUBLIC_VERCEL_URL as string}/spotify`}
           >
-            <ArrowRight />
-          </Button>
+            <Button
+              size="sm"
+              variant="subtle"
+              className="flex h-10 space-x-2 px-4 py-2"
+            >
+              <Icons.spotify className="h-4 w-4 shrink-0" />
+              <span>Library</span>
+            </Button>
+          </Link>
         </div>
         <SelectTrigger className="h-0 border-0 p-0 opacity-0">
           <SelectValue />
