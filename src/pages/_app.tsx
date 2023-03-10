@@ -750,13 +750,16 @@ const MusicPlayer = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="mr-3">
                   <DropdownMenuItem
-                    className="flex items-center space-x-3"
+                    className="disable-focus-visible flex cursor-pointer items-center space-x-3"
                     onClick={() => showToast("Coming Soon!", "warning")}
                   >
                     <ListPlus />
                     <span className="font-bold">Add to Playlist</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center space-x-3">
+                  <DropdownMenuItem
+                    className="disable-focus-visible flex cursor-pointer items-center space-x-3"
+                    onClick={() => showToast("Coming Soon!", "warning")}
+                  >
                     <Disc />
                     <span className="font-bold">View Album</span>
                   </DropdownMenuItem>
