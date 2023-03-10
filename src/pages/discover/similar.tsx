@@ -680,7 +680,11 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
               (isError && error?.message === LOADED_MORE_ERROR_MSG)) && (
               <ul className="space-y-2">
                 {tracks.map((track) => (
-                  <SelectItem value={JSON.stringify(track)} key={track.id}>
+                  <SelectItem
+                    value={JSON.stringify(track)}
+                    key={track.id}
+                    className="cursor-pointer"
+                  >
                     <SpotifyTrackItem track={track} />
                   </SelectItem>
                 ))}
