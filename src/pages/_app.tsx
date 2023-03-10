@@ -52,6 +52,7 @@ import { Progress } from "@/components/ui/progress";
 import { convertToSeconds, formatSongDuration } from "@/utils/song-time";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useRouter } from "next/router";
+import Link from "next/link";
 const fontSans = FontSans({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -64,6 +65,23 @@ type ActionType =
       songs: PlayerSong[];
     }
   | {
+      type: "SAVE_SCANNED_SONG";
+      song: PlayerSong;
+    }
+  | {
+      type: "RESET_SIMILAR_SONGS";
+      onlyResQtt?: boolean;
+    }
+  | {
+      type: "TOGGLE_MOBILE_PLAYER_OPEN";
+      open: boolean;
+    }
+  | {
+      type: "SET_SCANNING";
+      index: number;
+      scanning: boolean;
+    }
+  | {
       type: "TOGGLE_PLAY";
       playing?: boolean;
     }
@@ -71,11 +89,6 @@ type ActionType =
       type: "TOGGLE_FAVOURITE";
       songPos: number;
       favourite: boolean;
-    }
-  | {
-      type: "SET_SCANNING";
-      index: number;
-      scanning: boolean;
     }
   | {
       type: "TOGGLE_LOOP";
@@ -89,6 +102,9 @@ type ActionType =
       audioRef: React.MutableRefObject<HTMLAudioElement | null>;
     }
   | {
+      type: "SELECT_SCANNED_SONG";
+    }
+  | {
       type: "SELECT_SONG";
       forwardLoadingMore?: boolean;
       songPos: number;
@@ -98,6 +114,7 @@ type ActionType =
     }
   | {
       type: "RESET_SEARCH";
+      route?: (typeof playerPages)[number];
     }
   | {
       type: "ALL_RESULTS_SHOWN";
@@ -127,13 +144,15 @@ const playerPages = ["ai", "similar"] as const;
 type InitStateType = {
   crrRoute: (typeof playerPages)[number];
   audioRef: React.MutableRefObject<HTMLAudioElement | null>;
-  songsList: PlayerSong[] | null;
+  mobilePlayerOpen: boolean;
   playing: boolean;
   crrPlayingId: string | null;
   crrPlayingSong: PlayerSong | null;
   loop: boolean;
   trackReady: boolean | null;
   similar: {
+    scannedSong: PlayerSong | null;
+    songsList: PlayerSong[] | null;
     forwardLoadingMore: boolean;
     resPage: number;
     resQtt: number;
@@ -141,6 +160,7 @@ type InitStateType = {
     allResultsShown: boolean;
   };
   ai: {
+    songsList: PlayerSong[] | null;
     forwardLoadingMore: boolean;
     resPage: number;
     resQtt: number;
@@ -179,9 +199,53 @@ const createCtx = <StateType, ActionType>(
 const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
   switch (action.type) {
     case "SAVE_SONGS": {
+      console.log("SAVING SONGS", state.crrRoute);
       return {
         ...state,
-        songsList: action.songs,
+        [state.crrRoute]: {
+          ...state[state.crrRoute],
+          songsList: action.songs,
+        },
+      };
+    }
+    case "SAVE_SCANNED_SONG": {
+      return {
+        ...state,
+        similar: {
+          ...state.similar,
+          scannedSong: action.song,
+        },
+      };
+    }
+    case "RESET_SIMILAR_SONGS": {
+      const { audioRef } = state;
+      if (audioRef && audioRef.current) {
+        audioRef.current.src = "";
+        audioRef.current.currentTime = 0;
+      }
+
+      if (action.onlyResQtt) {
+        return {
+          ...state,
+          similar: {
+            ...state.similar,
+            resPage: 1,
+            resQtt: DEFAULT_RESULTS_QTT,
+          },
+        };
+      }
+      return {
+        ...state,
+        crrPlayingSong: null,
+        trackReady: null,
+        loop: false,
+        playing: false,
+        similar: {
+          ...state.similar,
+          songsList: null,
+          resPage: 1,
+          resQtt: DEFAULT_RESULTS_QTT,
+        },
       };
     }
     case "SAVE_CRR_ROUTE": {
@@ -190,34 +254,16 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         crrRoute: action.route,
       };
     }
-    case "TOGGLE_PLAY": {
+    case "TOGGLE_MOBILE_PLAYER_OPEN": {
       return {
         ...state,
-        playing: action.playing ?? !state.playing,
+        mobilePlayerOpen: action.open,
       };
     }
-    case "TOGGLE_FAVOURITE": {
-      if (state.songsList) {
-        const newSongsList = state.songsList;
-        const newSongItem = newSongsList[action.songPos];
 
-        if (newSongItem) {
-          newSongsList[action.songPos] = {
-            ...newSongItem,
-            favourite: action.favourite,
-          };
-        }
-        return {
-          ...state,
-          songsList: [...newSongsList],
-        };
-      }
-
-      return state;
-    }
     case "SET_SCANNING": {
-      if (state.songsList) {
-        const newSongsList = state.songsList;
+      if (state[state.crrRoute].songsList) {
+        const newSongsList = state[state.crrRoute].songsList!;
         const newSongItem = newSongsList[action.index];
 
         if (newSongItem) {
@@ -229,7 +275,38 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
 
         return {
           ...state,
-          songsList: [...newSongsList],
+          [state.crrRoute]: {
+            ...state[state.crrRoute],
+            songsList: [...newSongsList],
+          },
+        };
+      }
+
+      return state;
+    }
+    case "TOGGLE_PLAY": {
+      return {
+        ...state,
+        playing: action.playing ?? !state.playing,
+      };
+    }
+    case "TOGGLE_FAVOURITE": {
+      if (state[state.crrRoute].songsList) {
+        const newSongsList = state[state.crrRoute].songsList!;
+        const newSongItem = newSongsList[action.songPos];
+
+        if (newSongItem) {
+          newSongsList[action.songPos] = {
+            ...newSongItem,
+            favourite: action.favourite,
+          };
+        }
+        return {
+          ...state,
+          [state.crrRoute]: {
+            ...state[state.crrRoute],
+            songsList: [...newSongsList],
+          },
         };
       }
 
@@ -253,6 +330,12 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         audioRef: action.audioRef,
       };
     }
+    case "SELECT_SCANNED_SONG": {
+      return {
+        ...state,
+        crrPlayingSong: state.similar.scannedSong,
+      };
+    }
     case "SELECT_SONG": {
       // determine if forward or backward
       const prev = action.position === "prev";
@@ -263,10 +346,57 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         ? action.songPos + 1
         : action.songPos;
 
-      const { songsList, audioRef } = state;
+      const songsList = state[state.crrRoute].songsList;
+      const {
+        audioRef,
+        crrRoute,
+        similar: { scannedSong },
+      } = state;
 
-      const nonNegativeSongPos =
-        action.songPos === 0 || (action.songPos && action.songPos > 0);
+      const scannedIsPrev =
+        prev && scannedSong && positionId === -1 && crrRoute === "similar";
+      const nextFromScanned =
+        next && scannedSong && positionId === 0 && crrRoute === "similar";
+      const selectScanned =
+        !prev &&
+        !next &&
+        positionId === -1 &&
+        scannedSong &&
+        crrRoute === "similar";
+
+      // jump from selected track and songsList and viceversa when forwarding or backwarding
+      if (scannedIsPrev || selectScanned) {
+        if (audioRef && audioRef.current) {
+          audioRef.current.src = scannedSong.audioSrc || "";
+        }
+
+        return {
+          ...state,
+          crrPlayingPos: action.songPos,
+          crrPlayingSong: scannedSong,
+          similar: {
+            ...state.similar,
+            forwardLoadingMore: false,
+          },
+        };
+      }
+      if (nextFromScanned) {
+        if (audioRef && audioRef.current && songsList && songsList[0]) {
+          audioRef.current.src = songsList[0].audioSrc || "";
+        }
+
+        return {
+          ...state,
+          crrPlayingPos: action.songPos,
+          crrPlayingSong: songsList ? songsList[0] : null,
+          similar: {
+            ...state.similar,
+            forwardLoadingMore: false,
+          },
+        };
+      }
+
+      const nonInvalidSongPos = action.songPos === -1 || action.songPos > -1;
 
       const getClosestPlayableSong = () => {
         if (songsList && (next || prev) && !songsList[positionId]?.audioSrc) {
@@ -296,6 +426,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
           return songsList[positionId];
         }
       };
+      console.log("POSITION ID", positionId, "action", action.songPos);
 
       const closestSongRes = getClosestPlayableSong();
       console.log("closestSongRes", closestSongRes);
@@ -315,10 +446,11 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
           trackReady: action.trackReady || false,
         };
       }
+
       if (
         audioRef &&
         audioRef.current &&
-        nonNegativeSongPos &&
+        nonInvalidSongPos &&
         songsList &&
         closestSongRes
       ) {
@@ -332,7 +464,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         crrPlayingPos: action.songPos,
         crrPlayingSong:
           (songsList &&
-            nonNegativeSongPos &&
+            nonInvalidSongPos &&
             (getClosestPlayableSong() as PlayerSong)) ||
           null,
         [state.crrRoute]: {
@@ -342,13 +474,23 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
       };
     }
     case "RESET_SEARCH": {
+      if (state.audioRef.current) {
+        state.audioRef.current.src = "";
+        state.audioRef.current.currentTime = 0;
+      }
+      console.log("is reset serach running");
+
       return {
         ...state,
-        [state.crrRoute]: {
-          ...state[state.crrRoute as "ai" | "similar"],
+        trackReady: null,
+        crrPlayingSong: null,
+        [action.route || state.crrRoute]: {
+          ...state[action.route || state.crrRoute],
+          songsList: null,
           resPage: 1,
           resQtt: DEFAULT_RESULTS_QTT,
           allResultsShown: false,
+          loadingMore: false,
         },
       };
     }
@@ -381,6 +523,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
       };
     }
     case "STOP_LOADING_MORE_SIMILAR": {
+      console.log("ABOUT TO stop loading more state");
       return {
         ...state,
         [state.crrRoute]: {
@@ -399,14 +542,16 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
 const musicPlayerInitState: InitStateType = {
   crrRoute: playerPages[0],
   playing: false,
+  mobilePlayerOpen: false,
   crrPlayingId: null,
   crrPlayingSong: null,
   loop: false,
 
-  songsList: null,
   trackReady: null,
   audioRef: { current: null },
   similar: {
+    scannedSong: null,
+    songsList: null,
     forwardLoadingMore: false,
     resPage: 1,
     resQtt: DEFAULT_RESULTS_QTT,
@@ -414,6 +559,7 @@ const musicPlayerInitState: InitStateType = {
     allResultsShown: false,
   },
   ai: {
+    songsList: null,
     forwardLoadingMore: false,
     resPage: 1,
     resQtt: DEFAULT_RESULTS_QTT,
@@ -433,15 +579,15 @@ const MusicPlayer = () => {
   const { status } = useSession();
 
   const {
-    state: { crrPlayingSong, loop, trackReady },
+    state: { crrPlayingSong, loop, trackReady, mobilePlayerOpen },
     dispatch,
   } = useContext(MusicPlayerContext);
   useEffect(() => {
     const crrRoute = router.pathname.includes("similar") ? "similar" : "ai";
     dispatch({ type: "SAVE_CRR_ROUTE", route: crrRoute });
-  }, []);
+    dispatch({ type: "RESET_SEARCH", route: crrRoute });
+  }, [router.pathname]);
 
-  const [playerOpen, setPlayerOpen] = useState(false);
   const [soundHovered, setSoundHovered] = useState(false);
 
   const [crrSoundPerc, setCrrSoundPerc] = useState<number>(DEFAULT_SOUND);
@@ -470,7 +616,14 @@ const MusicPlayer = () => {
           ref={audioRef}
           loop={loop}
           onLoadStart={() => {
-            dispatch({ type: "SET_TRACK_READY", ready: false });
+            if (
+              audioRef.current &&
+              !audioRef.current.src.includes(
+                process.env.NEXT_PUBLIC_VERCEL_URL as string
+              )
+            ) {
+              dispatch({ type: "SET_TRACK_READY", ready: false });
+            }
           }}
           onLoadedData={(e) => {
             const target = e.target as HTMLAudioElement;
@@ -490,11 +643,11 @@ const MusicPlayer = () => {
             const target = e.target as HTMLAudioElement;
             const percentage = target.currentTime / duration!;
 
-            setCrrSongPerc(percentage);
+            crrPlayingSong && setCrrSongPerc(percentage);
           }}
-          onWaiting={() => {
-            dispatch({ type: "SET_TRACK_READY", ready: false });
-          }}
+          // onWaiting={() => {
+          //   dispatch({ type: "SET_TRACK_READY", ready: false });
+          // }}
           onEnded={() => {
             dispatch({ type: "TOGGLE_PLAY", playing: false });
             if (crrPlayingSong) {
@@ -519,7 +672,7 @@ const MusicPlayer = () => {
               onClick={(e) => {
                 const target = e.target as HTMLDivElement;
                 if (!target.closest("button")) {
-                  setPlayerOpen(true);
+                  dispatch({ type: "TOGGLE_MOBILE_PLAYER_OPEN", open: true });
                 }
               }}
             >
@@ -537,7 +690,7 @@ const MusicPlayer = () => {
                 <div className="dark:slate-50 w-[calc(100%-8rem)] text-sm">
                   <p className="truncate font-bold">{crrPlayingSong.title}</p>
                   <p className="truncate font-normal">
-                    {crrPlayingSong.artists[0]}
+                    {crrPlayingSong.artists.join(", ")}
                   </p>
                 </div>
                 {/* controls */}
@@ -573,12 +726,17 @@ const MusicPlayer = () => {
               "fixed inset-0 flex h-screen w-screen transform flex-col transition duration-200 ease-in-out md:hidden",
               "bg-gradient-to-b from-gray-50 to-gray-100 p-3",
               "dark:from-slate-800 dark:to-slate-900",
-              playerOpen ? "translate-y-0" : "translate-y-full"
+              mobilePlayerOpen ? "translate-y-0" : "translate-y-full"
             )}
           >
             {/* close and more */}
             <div className="mb-10 flex w-full items-center">
-              <button className="p-2" onClick={() => setPlayerOpen(false)}>
+              <button
+                className="p-2"
+                onClick={() =>
+                  dispatch({ type: "TOGGLE_MOBILE_PLAYER_OPEN", open: false })
+                }
+              >
                 <ChevronDown className="h-8 w-8" />
               </button>
 
@@ -631,7 +789,7 @@ const MusicPlayer = () => {
                         {crrPlayingSong.title}
                       </p>
                       <p className="truncate font-normal">
-                        {crrPlayingSong.artists[0]}
+                        {crrPlayingSong.artists.join(", ")}
                       </p>
                     </>
                   )}
@@ -723,7 +881,7 @@ const MusicPlayer = () => {
                 <div className="dark:slate-50 mx-3.5 w-1/2 text-sm">
                   <p className="truncate">{crrPlayingSong.title}</p>
                   <p className="truncate text-[0.6875rem] text-slate-500 dark:text-slate-400">
-                    {crrPlayingSong.artists[0]}
+                    {crrPlayingSong.artists.join(", ")}
                   </p>
                 </div>
               )}
@@ -882,15 +1040,31 @@ const MusicPlayer = () => {
 };
 
 const PlaybackControls = ({ className }: { className?: string }) => {
+  const { state, dispatch } = useContext(MusicPlayerContext);
+
   const {
-    state: { songsList, crrPlayingSong, loop, trackReady },
-    dispatch,
-  } = useContext(MusicPlayerContext);
-  const prevInvalidFirst =
-    crrPlayingSong && songsList
-      ? crrPlayingSong.position - 1 === 0 && !songsList[0]?.audioSrc
-      : false;
-  const firstSong = crrPlayingSong ? crrPlayingSong.position === 0 : false;
+    crrPlayingSong,
+    loop,
+    trackReady,
+    crrRoute,
+    similar: { scannedSong },
+  } = state;
+  const songsList = state[state.crrRoute].songsList;
+
+  const onSimilar = crrRoute === "similar";
+  const prevSongInvalid =
+    songsList &&
+    crrPlayingSong &&
+    !songsList[crrPlayingSong.position - 1]?.audioSrc;
+  const notOnSimilarPrevSongInvalid = !onSimilar && prevSongInvalid;
+  const onSimilarPrevSongInvalid = onSimilar && prevSongInvalid && !scannedSong;
+  const onSimilarScannedSongPlaying =
+    onSimilar && crrPlayingSong && crrPlayingSong.position === -1;
+
+  const firstSong =
+    notOnSimilarPrevSongInvalid ||
+    onSimilarPrevSongInvalid ||
+    onSimilarScannedSongPlaying;
   const scanning = crrPlayingSong?.scanning;
 
   return (
@@ -901,22 +1075,24 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       )}
     >
       {/* scan button */}
-      <ScanSimilarsBttn
-        disabled={!crrPlayingSong}
-        index={crrPlayingSong?.position as number}
-        iconClassName="h-6 w-6 md:h-4 md:w-4"
-      />
+      {crrPlayingSong ? (
+        <ScanSimilarsBttn
+          trackId={crrPlayingSong?.id}
+          iconClassName="h-6 w-6 md:h-4 md:w-4"
+        />
+      ) : (
+        <span className="h-12 w-12 opacity-0 md:h-8 md:w-8" />
+      )}
 
-      {/* back button */}
+      {/* backward button */}
       <button
         className={cn(
           "group p-3 md:p-2",
-          (scanning || firstSong || prevInvalidFirst) &&
-            "cursor-not-allowed text-slate-400"
+          (scanning || firstSong) && "cursor-not-allowed text-slate-400"
         )}
-        disabled={scanning || firstSong || prevInvalidFirst}
+        disabled={scanning || !!firstSong}
         onClick={() => {
-          if (crrPlayingSong && !firstSong && !prevInvalidFirst) {
+          if (crrPlayingSong && !firstSong) {
             dispatch({
               type: "SELECT_SONG",
               position: "prev",
@@ -930,10 +1106,8 @@ const PlaybackControls = ({ className }: { className?: string }) => {
             "h-8 w-8 fill-current md:h-4 md:w-4",
             !scanning &&
               !firstSong &&
-              !prevInvalidFirst &&
               "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            (scanning || firstSong || prevInvalidFirst) &&
-              "fill-slate-400 md:text-slate-400"
+            (scanning || firstSong) && "fill-slate-400 md:text-slate-400"
           )}
         />
       </button>
@@ -1037,7 +1211,7 @@ const PlayBttn = ({
       }}
       disabled={scanning || trackReady === false}
     >
-      {trackReady === false && <LoadingIcon />}
+      {trackReady === false && audioRef.current?.src && <LoadingIcon />}
       {playing ? (
         <Pause className={cn(iconClassName, "translate-x-0")} />
       ) : (
@@ -1078,67 +1252,66 @@ export const LoadingIcon = ({
 );
 
 export const ScanSimilarsBttn = ({
-  index,
+  trackPos,
+  trackId,
   musicPlayer,
   className,
   iconClassName,
   ...props
 }: React.ComponentProps<typeof Button> & {
-  index?: number;
+  trackPos?: number;
+  trackId?: string;
   musicPlayer?: boolean;
   className?: string;
   iconClassName?: string;
 }) => {
-  const {
-    state: { songsList, crrPlayingSong },
-    dispatch,
-  } = useContext(MusicPlayerContext);
+  const { state, dispatch } = useContext(MusicPlayerContext);
+
+  const { crrPlayingSong } = state;
+  const songsList = state[state.crrRoute].songsList;
+
+  const validIndex =
+    (typeof trackPos === "number" && (trackPos === 0 ? "0" : trackPos)) ||
+    crrPlayingSong?.position;
+
   const scanning =
-    (songsList &&
-      (index === 0 || (index && index > 0)) &&
-      songsList[index]?.scanning) ||
+    (songsList && validIndex && songsList[validIndex]?.scanning) ||
     crrPlayingSong?.scanning;
 
-  const disabled = props.disabled || scanning;
-
-  index = crrPlayingSong?.position || index;
-
   return (
-    <button
-      {...props}
-      className={cn(
-        "group p-3 md:p-2",
-        disabled && "cursor-not-allowed",
-        className
-      )}
+    <Link
+      shallow={true}
+      href={`${process.env.NEXT_PUBLIC_VERCEL_URL}/discover/similar?trackid=${trackId}`}
       onClick={() => {
-        if (!disabled) {
+        if (!scanning) {
+          showToast("Discovering similar songs!", "success");
           dispatch({
             type: "SET_SCANNING",
-            index: index as number,
+            index: validIndex as number,
             scanning: true,
           });
-          showToast("Discovering similar songs!", "success");
-          setTimeout(() => {
-            dispatch({
-              type: "SET_SCANNING",
-              index: index as number,
-              scanning: false,
-            });
-            showToast("10 songs found", "success");
-          }, 3000);
+          dispatch({ type: "RESET_SIMILAR_SONGS", onlyResQtt: true });
         }
       }}
     >
-      <ScanLine
+      <button
+        {...props}
         className={cn(
-          "h-4 w-4",
-          "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
-          scanning && "!text-accentBright",
-          iconClassName
+          "group p-3 md:p-2",
+          scanning && "cursor-not-allowed",
+          className
         )}
-      />
-    </button>
+      >
+        <ScanLine
+          className={cn(
+            "h-4 w-4",
+            "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
+            scanning && "!text-accentBright",
+            iconClassName
+          )}
+        />
+      </button>
+    </Link>
   );
 };
 
@@ -1152,10 +1325,11 @@ export const FavouriteBttn = ({
   iconClassName?: string;
   songPos: number;
 }) => {
-  const {
-    state: { songsList, crrPlayingSong },
-    dispatch,
-  } = useContext(MusicPlayerContext);
+  const { state, dispatch } = useContext(MusicPlayerContext);
+
+  const { crrPlayingSong } = state;
+  const songsList = state[state.crrRoute].songsList;
+
   const song =
     (songsList &&
       (songPos === 0 || (songPos && songPos > 0)) &&

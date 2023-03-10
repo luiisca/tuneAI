@@ -1,6 +1,5 @@
 import { env } from "@/env/server.mjs";
 import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
@@ -364,10 +363,10 @@ const enqueueSpotifyTrackAnalysis = async (trackID: string) => {
     enqueuedSpotifyTrack.data.spotifyTrackEnqueue;
   console.log("enqueed", enqueuedSpotifyTrackResult);
   if ("message" in enqueuedSpotifyTrackResult) {
-    throw new TRPCError({
+    return {
       code: "INTERNAL_SERVER_ERROR",
       message: enqueuedSpotifyTrackResult.message,
-    });
+    };
   }
 
   return enqueuedSpotifyTrackResult.enqueuedSpotifyTrack.id;
@@ -474,18 +473,18 @@ export const discoverRouter = createTRPCRouter({
         const timeout = now - startingTime >= 30;
 
         if (timeout) {
-          return {
-            code: "TIMEOUT",
-            message: "Could not find any similar song. Sorry",
-          };
+          return [];
         }
 
         if (
           "code" in lastSimSongs &&
           lastSimSongs.code === NOT_ANALYZED_ERR_CODE
         ) {
-          console.log("ERROR, RETYRING", lastSimSongs.code);
-          await enqueueSpotifyTrackAnalysis(trackId);
+          console.log("ERROR, RETYRING", lastSimSongs);
+          const enqueRes = await enqueueSpotifyTrackAnalysis(trackId);
+          if (typeof enqueRes !== "string" && "message" in enqueRes) {
+            return enqueRes;
+          }
 
           recursiveGetAiSimilarSongs();
 

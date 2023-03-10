@@ -27,7 +27,7 @@ const getSpotifyTrack = async (trackId: string, refreshToken: string) => {
 
   return {
     id: data.id,
-    position: 0,
+    position: -1,
     favourite: false,
     scanning: false,
     audioSrc: data.preview_url,

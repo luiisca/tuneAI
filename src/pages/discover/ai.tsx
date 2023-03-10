@@ -2,13 +2,7 @@ import { Input } from "@/components/ui/core/input";
 import Shell from "@/components/ui/core/shell";
 import { api } from "@/utils/api";
 import { debounce } from "lodash";
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type UIEvent,
-} from "react";
+import { useContext, useEffect, useState, type UIEvent } from "react";
 
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import { CircleSlashed, Music2 } from "lucide-react";
@@ -68,10 +62,10 @@ const Ai = () => {
   const utils = api.useContext();
   const router = useRouter();
 
-  const {
-    state: { songsList, ai },
-    dispatch,
-  } = useContext(MusicPlayerContext);
+  const { state, dispatch } = useContext(MusicPlayerContext);
+
+  const { ai } = state;
+  const songsList = state[state.crrRoute].songsList;
 
   const {
     data: recomSongs,
@@ -86,8 +80,8 @@ const Ai = () => {
       refetchOnReconnect: false,
       refetchOnMount: false,
       onSuccess: (data) => {
-        console.log("procedure DATA", data);
-        console.log("resutlsQTT", ai.resQtt);
+        // console.log("procedure DATA", data);
+        // console.log("resutlsQTT", ai.resQtt);
         const formatTracksForSongsList = (tracks: SongType[]) => {
           return tracks.map((track, index: number) => ({
             position: (songsList?.length || 0) + index,
@@ -157,15 +151,16 @@ const Ai = () => {
   );
 
   useEffect(() => {
-    if (isFetched) {
+    if (isFetched && !isFetching && ai.loadingMore) {
       dispatch({ type: "STOP_LOADING_MORE_SIMILAR" });
+
       const prevData = utils.discover.ai.getData({
         text: searchValue,
         first: ai.resQtt - DEFAULT_RESULTS_QTT,
       }) as SongType[];
-      console.log("prevData", prevData);
+      // console.log("prevData", prevData);
       if (prevData && ai.forwardLoadingMore) {
-        console.log("ISFETCHED, dispatching", prevData);
+        // console.log("ISFETCHED, dispatching", prevData);
         dispatch({
           type: "SELECT_SONG",
           forwardLoadingMore: false,
@@ -176,7 +171,7 @@ const Ai = () => {
         });
       }
     }
-  }, [isFetched, ai.loadingMore]);
+  }, [isFetched, isFetching, ai.loadingMore]);
 
   useEffect(() => {
     const query = router.asPath.split("?")[1];
@@ -235,7 +230,7 @@ const Ai = () => {
         />
       )}
 
-      {recomSongs && recomSongs.length !== 0 && (
+      {recomSongs && !("message" in recomSongs) && recomSongs.length !== 0 && (
         <div className="h-[calc(100%-11rem)] ">
           {(!isFetching || (isFetching && ai.loadingMore)) && (
             <ul
@@ -273,10 +268,8 @@ const Ai = () => {
 export const TrackItem = ({
   index,
   track,
-  similarList = false,
 }: {
   index: number;
-  similarList?: boolean;
   track:
     | SongType
     | Omit<SongType, "genres" | "moods" | "instruments" | "musicalEra">;
@@ -305,7 +298,7 @@ export const TrackItem = ({
     >
       <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
         <span className="flex w-4 shrink-0  items-center justify-center font-semibold">
-          {similarList ? index : index + 1}
+          {index + 1}
         </span>
         <div className="relative h-10 w-10 shrink-0">
           <Image
@@ -323,17 +316,19 @@ export const TrackItem = ({
         <div className="overflow-hidden">
           <p className="truncate">{track.title}</p>
           <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-            {track.artists[0]}
+            {track.artists.join(", ")}
           </p>
         </div>
       </div>
       <div className="flex items-center space-x-4">
         <div className="flex items-center">
-          <ScanSimilarsBttn
-            disabled={!track.previewUrl}
-            index={index}
-            className="group-hover:opacity-100 lg:opacity-0"
-          />
+          {track.previewUrl && (
+            <ScanSimilarsBttn
+              trackPos={index}
+              trackId={track.id}
+              className="group-hover:opacity-100 lg:opacity-0"
+            />
+          )}
           <FavouriteBttn
             className="group group-hover:opacity-100 lg:opacity-0"
             iconClassName="h-4 w-4"

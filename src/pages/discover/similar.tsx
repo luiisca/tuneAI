@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/core/select";
 import { Input } from "@/components/ui/core/input";
 // import { MusicPlayerContext } from "../_app";
-import { ItemSkeleton, ListSkeleton, TrackItem } from "./ai";
+import { ListSkeleton, TrackItem } from "./ai";
 import { MusicPlayerContext, PlayerSong } from "../_app";
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import { ArrowRight, CircleSlashed, Music2 } from "lucide-react";
@@ -105,7 +105,7 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
         spotify: {
           ...state.spotify,
           listOpen: true,
-          resPage: 0,
+          resPage: 1,
           resQtt: DEFAULT_RESULTS_QTT,
         },
       };
@@ -149,58 +149,44 @@ const Similar = () => {
 
   const utils = api.useContext();
 
-  const {
-    state: { songsList, similar },
-    dispatch: dispatchPlayer,
-  } = useContext(MusicPlayerContext);
+  const { state: statePlayer, dispatch: dispatchPlayer } =
+    useContext(MusicPlayerContext);
 
-  const { isFetching: spotifyTrackIsFetching } =
-    api.spotify.singleTrack.useQuery(
-      {
-        trackId: selectedTrackId,
-      },
-      {
-        enabled: !!selectedTrackId,
-        keepPreviousData: true,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false,
-        onSuccess: (data) => {
-          if (data) {
-            if ("message" in data) {
-              dispatch({
-                type: "SELECT_TRACK",
-                track: null,
-              });
-              if (songsList && songsList[0]) {
-                dispatchPlayer({
-                  type: "SAVE_SONGS",
-                  songs: [
-                    {
-                      ...songsList[0],
-                      // little hack to ensure prev song cannot be played
-                      audioSrc: null,
-                    },
-                    ...songsList,
-                  ],
-                });
-              }
-            } else {
-              dispatch({
-                type: "SELECT_TRACK",
-                track: data,
-              });
-              if (songsList) {
-                dispatchPlayer({
-                  type: "SAVE_SONGS",
-                  songs: [data, ...songsList],
-                });
-              }
-            }
+  const { similar } = statePlayer;
+  const songsList = statePlayer[statePlayer.crrRoute].songsList;
+
+  const {} = api.spotify.singleTrack.useQuery(
+    {
+      trackId: selectedTrackId,
+    },
+    {
+      enabled: !!selectedTrackId,
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      onSuccess: (data) => {
+        if (data) {
+          if (!("message" in data)) {
+            dispatch({
+              type: "SELECT_TRACK",
+              track: data,
+            });
+            dispatchPlayer({
+              type: "SAVE_SCANNED_SONG",
+              song: data,
+            });
+          } else {
+            dispatch({
+              type: "SELECT_TRACK",
+              track: null,
+            });
+            showToast(data.message as string, "error");
           }
-        },
-      }
-    );
+        }
+      },
+    }
+  );
 
   const {
     data: tracks,
@@ -227,10 +213,13 @@ const Similar = () => {
         return true;
       },
       onSuccess: (data) => {
+        similar.resPage === 1 &&
+          dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
+
         const formatTracksForSongsList = (tracks: SongType[]) => {
           return tracks.map((track, index: number) => ({
-            // index + 1 because of extra song added to the start of songsList
-            position: (songsList?.length || 0) + index + 1,
+            position:
+              ((similar.resPage === 1 ? 0 : songsList?.length) || 0) + index,
             id: track.id,
             title: track.title,
             artists: track.artists,
@@ -252,29 +241,26 @@ const Similar = () => {
           },
           () => {
             if (!("message" in data)) {
-              console.log("SIMILAR ONSUCCESS: no Message ", data);
-              if (similar.resQtt === DEFAULT_RESULTS_QTT && data) {
+              selectedTrack &&
                 dispatchPlayer({
-                  type: "SAVE_SONGS",
-                  songs:
-                    selectedTrack && similar.resPage === 1
-                      ? [selectedTrack, ...formatTracksForSongsList(data)]
-                      : [...formatTracksForSongsList(data)],
+                  type: "SAVE_SCANNED_SONG",
+                  song: selectedTrack,
                 });
 
-                return data;
-              }
+              statePlayer.mobilePlayerOpen &&
+                dispatchPlayer({
+                  type: "TOGGLE_MOBILE_PLAYER_OPEN",
+                  open: false,
+                });
+
+              console.log("SIMILAR ONSUCCESS: no Message ", data);
               if (prevData && data) {
                 dispatchPlayer({
                   type: "SAVE_SONGS",
-                  songs:
-                    selectedTrack && similar.resPage === 1
-                      ? [
-                          selectedTrack,
-                          ...songsList!,
-                          ...formatTracksForSongsList(data),
-                        ]
-                      : [...songsList!, ...formatTracksForSongsList(data)],
+                  songs: [
+                    ...(songsList || []),
+                    ...formatTracksForSongsList(data),
+                  ],
                 });
 
                 return [...prevData, ...data];
@@ -283,15 +269,13 @@ const Similar = () => {
               if (data) {
                 dispatchPlayer({
                   type: "SAVE_SONGS",
-                  songs:
-                    selectedTrack && similar.resPage === 1
-                      ? [selectedTrack, ...formatTracksForSongsList(data)]
-                      : [...formatTracksForSongsList(data)],
+                  songs: [...formatTracksForSongsList(data)],
                 });
 
                 return data;
               }
             }
+
             console.log("SIMILAR ONSUCCESS: Message ", data);
             if (data.message === LOADED_MORE_ERROR_MSG) {
               showToast(data.message as string, "success");
@@ -319,13 +303,17 @@ const Similar = () => {
   useEffect(() => {
     const query = router.asPath.split("?")[1];
     if (query?.includes("trackid")) {
+      console.log("QUERY", query, typeof query);
       const trackId = new URLSearchParams(query).get("trackid");
-      dispatch({ type: "SELECT_TRACK_ID", value: trackId! });
+      trackId !== "null" &&
+        trackId !== "undefined" &&
+        dispatch({ type: "SELECT_TRACK_ID", value: trackId! });
     }
-  }, []);
+  }, [router.query.trackid]);
 
   useEffect(() => {
-    if (isFetched && !isFetching) {
+    if (isFetched && !isFetching && similar.loadingMore) {
+      console.log("ABOUT TO stop loading more UE");
       dispatchPlayer({ type: "STOP_LOADING_MORE_SIMILAR" });
 
       const prevData = utils.discover.similar.getData({
@@ -343,7 +331,7 @@ const Similar = () => {
         });
       }
     }
-  }, [isFetched, isFetching]);
+  }, [isFetched, isFetching, similar.loadingMore]);
 
   const [loadMore] = useLoadMore({
     loadingMore: similar.loadingMore,
@@ -361,24 +349,48 @@ const Similar = () => {
     <Shell heading="Discover" subtitle="Find similar songs with AI">
       <div
         className={cn(
-          "absolute right-0 top-16 flex min-h-min w-1/2 items-center justify-center rounded-l-xl bg-slate-800 shadow-slate-400 animate-in sm:top-24 md:top-0 md:rounded-t-none",
-          spotifyTrackIsFetching && "slide-in-from-right"
+          "border border-gray-100 bg-gray-50 opacity-0 dark:border-slate-900 dark:bg-slate-800",
+          "absolute right-0 top-16 flex min-h-min w-2/5 items-center justify-center overflow-hidden rounded-l-xl opacity-100 sm:top-24 sm:w-1/2 md:top-2 lg:top-8",
+          isFetching &&
+            similar.resPage === 1 &&
+            "opacity-100 animate-in slide-in-from-right"
         )}
       >
-        {spotifyTrackIsFetching && (
-          <SkeletonContainer>
-            <ItemSkeleton time={false} />
+        {isFetching && similar.resPage === 1 && (
+          <SkeletonContainer className="w-full">
+            <div className="flex h-16 animate-pulse items-center justify-between space-x-2 py-2 pl-4 dark:bg-slate-900 md:h-20">
+              <div className="flex h-full w-full flex-row-reverse items-center justify-between space-x-4">
+                {/* image */}
+                <SkeletonText className="hidden shrink-0 rounded-none sm:block sm:h-16 sm:w-16 md:h-20 md:w-20" />
+                <div className="flex w-full flex-col justify-center space-y-1">
+                  {/* title */}
+                  <SkeletonText className="h-5 w-3/5 sm:w-1/3" />
+                  {/* artist */}
+                  <SkeletonText className="h-4 w-4/5 text-sm sm:w-1/4" />
+                </div>
+              </div>
+            </div>
           </SkeletonContainer>
         )}
-        {selectedTrack && (
+        {/* selectedTrack && isFetched */}
+        {((selectedTrack && !isFetching) ||
+          (selectedTrack && isFetching && similar.resPage !== 1)) && (
           <div
             onClick={(e) => {
               const target = e.target as HTMLDivElement;
-              if (!target.closest("button")) {
+              if (
+                selectedTrack &&
+                isFetched &&
+                !isFetching &&
+                !target.closest("button")
+              ) {
                 if (selectedTrack.audioSrc) {
                   dispatchPlayer({
+                    type: "SELECT_SCANNED_SONG",
+                  });
+                  dispatchPlayer({
                     type: "SELECT_SONG",
-                    songPos: 0,
+                    songPos: selectedTrack.position,
                   });
                 } else {
                   showToast("Cannot play. Sorry", "error");
@@ -386,12 +398,14 @@ const Similar = () => {
               }
             }}
             className={cn(
-              "group flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4 hover:bg-slate-100 dark:hover:bg-slate-700",
-              !selectedTrack.audioSrc && "cursor-not-allowed opacity-40"
+              "group flex w-full rounded-md ",
+              isFetching || !selectedTrack.audioSrc
+                ? "cursor-not-allowed opacity-40"
+                : "cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700"
             )}
           >
-            <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
-              <div className="relative h-14 w-14 shrink-0">
+            <div className="flex h-full w-full flex-row-reverse items-center justify-between space-x-4">
+              <div className="relative hidden shrink-0 sm:block sm:h-16 sm:w-16 md:h-20 md:w-20">
                 <Image
                   alt={`${selectedTrack.title} playing`}
                   fill
@@ -404,10 +418,10 @@ const Similar = () => {
                   className="object-cover"
                 />
               </div>
-              <div className="overflow-hidden">
+              <div className="flex h-16 w-full flex-col justify-center overflow-hidden sm:w-4/5 md:h-20">
                 <p className="truncate">{selectedTrack.title}</p>
                 <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-                  {selectedTrack.artists[0]}
+                  {selectedTrack.artists.join(", ")}
                 </p>
               </div>
             </div>
@@ -427,12 +441,19 @@ const Similar = () => {
         open={spotify.listOpen}
         onValueChange={(value) => {
           const track = JSON.parse(value) as SpotifyTrackResultType;
-          router.replace({
+          console.log("ONVALUECHANGE SElECT", track);
+          router.push({
             pathname: router.pathname,
             query: {
               trackid: track.id,
             },
           });
+          if (!track.previewUrl) {
+            showToast("Cannot play. Sorry", "error");
+
+            return;
+          }
+
           dispatch({
             type: "SELECT_TRACK",
             track: {
@@ -459,8 +480,8 @@ const Similar = () => {
               const { target } = e as Event & { target: HTMLInputElement };
               const text = target.value.trim();
 
+              dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
               dispatch({ type: "RESET_SEARCH", searchValue: text });
-              dispatchPlayer({ type: "RESET_SEARCH" });
             }, 800)}
           />
           <Button
@@ -493,7 +514,7 @@ const Similar = () => {
           description="What are you waiting for"
         />
       )}
-      {tracks && tracks.length !== 0 && (
+      {tracks && !("message" in tracks) && tracks.length !== 0 && (
         <div className="h-[calc(100%-11rem)] ">
           {/* @TODO: take a look at this condition, might be unncessary */}
           {(!isFetching || (isFetching && similar.loadingMore)) && (
@@ -509,20 +530,14 @@ const Similar = () => {
               }, 1000)}
             >
               {tracks.map((track, index) => (
-                // index + 1 because of extra song added to the start of songsList
-                <TrackItem
-                  index={index + 1}
-                  similarList
-                  track={track}
-                  key={track.id}
-                />
+                <TrackItem index={index} track={track} key={track.id} />
               ))}
               {isFetching && similar.loadingMore && <ListSkeleton />}
             </ul>
           )}
         </div>
       )}
-      {tracks && tracks.length === 0 && (
+      {!isFetching && tracks && tracks.length === 0 && (
         <EmptyScreen
           Icon={() => <CircleSlashed />}
           headline="No results"
@@ -642,7 +657,7 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
           <ListSkeleton Item={SpotifyItemSkeleton} />
         )}
 
-        {tracks && tracks.length !== 0 && (
+        {tracks && !("message" in tracks) && tracks.length !== 0 && (
           <div>
             {(!isFetching ||
               (isFetching && loadingMore) ||
@@ -702,7 +717,7 @@ export const SpotifyTrackItem = ({
         <div className="overflow-hidden">
           <p className="truncate">{track.title}</p>
           <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-            {track.artists[0]}
+            {track.artists.join(", ")}
           </p>
         </div>
       </div>
