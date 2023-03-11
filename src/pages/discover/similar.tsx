@@ -257,6 +257,7 @@ const Similar = () => {
           () => {
             if (!("message" in data)) {
               selectedTrack &&
+                similar.resPage === 1 &&
                 dispatchPlayer({
                   type: "SAVE_SCANNED_SONG",
                   song: selectedTrack,
@@ -268,7 +269,7 @@ const Similar = () => {
                   open: false,
                 });
 
-              console.log("SIMILAR ONSUCCESS: no Message ", data);
+              // console.log("SIMILAR ONSUCCESS: no Message ", data);
               if (prevData && data) {
                 dispatchPlayer({
                   type: "SAVE_SONGS",
@@ -576,7 +577,7 @@ const Similar = () => {
         />
       )}
       {tracks && !("message" in tracks) && tracks.length !== 0 && (
-        <div className="h-[calc(100%-11rem)] ">
+        <div className="h-[calc(100%-13rem)] ">
           {/* @TODO: take a look at this condition, might be unncessary */}
           {(!isFetching || (isFetching && similar.loadingMore)) && (
             <ul
@@ -639,10 +640,12 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
       refetchOnReconnect: false,
       refetchOnMount: false,
       onSuccess: (data) => {
+        console.log("SPOTIFY LIST DATA", data);
         const prevData = utils.spotify.tracksList.getData({
           trackName: searchValue,
           offset: resPage * DEFAULT_RESULTS_QTT - DEFAULT_RESULTS_QTT,
         }) as unknown as SpotifyTrackResultType[];
+        console.log("PREV SPOTIFY LIST DATA", prevData);
 
         utils.spotify.tracksList.setData(
           {
@@ -682,16 +685,16 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
   }, [error]);
 
   useEffect(() => {
-    if (isFetched) {
+    if (isFetched && !isFetching && loadingMore) {
       setLoadingMore(false);
     }
-  }, [isFetched, loadingMore]);
+  }, [isFetched, isFetching, loadingMore]);
 
   const updateFn = useCallback(() => {
     console.log("update fn run", resPage);
     setResPage(resPage + 1);
     setLoadingMore(true);
-  }, [resPage]);
+  }, [resPage, loadingMore]);
 
   const [loadMore] = useLoadMore<HTMLDivElement>({
     loadingMore,
@@ -715,7 +718,12 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
       </SelectItem>
       <div>
         {isFetching && !loadingMore && (
-          <ListSkeleton Item={SpotifyItemSkeleton} />
+          <>
+            <div className="rounded-sm bg-blue-500 px-4 py-2">
+              is fetching but NOT loading more
+            </div>
+            <ListSkeleton Item={SpotifyItemSkeleton} />
+          </>
         )}
 
         {tracks && !("message" in tracks) && tracks.length !== 0 && (
@@ -736,7 +744,12 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
               </ul>
             )}
             {isFetching && loadingMore && (
-              <ListSkeleton Item={SpotifyItemSkeleton} />
+              <>
+                <div className="rounded-sm bg-red-500 px-4 py-2">
+                  Is fetching and Loadin more
+                </div>
+                <ListSkeleton Item={SpotifyItemSkeleton} />
+              </>
             )}
           </div>
         )}

@@ -20,15 +20,16 @@ const useLoadMore = <T extends HTMLElement>({
   const loadMore = useCallback(
     (e: UIEvent<T>) => {
       if (!allResultsShown) {
-        console.log("LOAD MORE DEBOUNCED FN : ", "isFetched", isFetched);
+        // console.log("LOAD MORE DEBOUNCED FN : ", "isFetched", isFetched);
 
         if (e) {
           const el = e.target as T;
           const clientHeight = el.clientHeight;
           const scrollHeight = el.scrollHeight;
           const scrollTop = el.scrollTop;
+          // console.table({ clientHeight, scrollHeight, scrollTop });
 
-          if (scrollTop + clientHeight >= scrollHeight) {
+          if (Math.ceil(scrollTop + clientHeight) >= scrollHeight) {
             console.log("LOAD MORE DEBOUNCED FN:  bottom reached");
             console.log("loading more", loadingMore);
 

@@ -231,7 +231,7 @@ const Ai = () => {
       )}
 
       {recomSongs && !("message" in recomSongs) && recomSongs.length !== 0 && (
-        <div className="h-[calc(100%-11rem)] ">
+        <div className="h-[calc(100%-13rem)] ">
           {(!isFetching || (isFetching && ai.loadingMore)) && (
             <ul
               className={cn(

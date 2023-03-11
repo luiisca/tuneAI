@@ -463,16 +463,21 @@ export const discoverRouter = createTRPCRouter({
       let songs: SongType[] = [];
 
       const startingTime = Date.now() / 1000;
+      console.log("STARTING TIME", startingTime);
       const NOT_ANALYZED_ERR_CODE = "trackNotAnalyzed";
 
-      const recursiveGetAiSimilarSongs = async () => {
-        console.log("RUNNIG RECURSIVE FN");
+      const recursiveGetAiSimilarSongs = async (): Promise<
+        (SongResult | null)[] | { message: string }
+      > => {
+        console.log("🔁 RUNNIG RECURSIVE FN");
         const now = Date.now() / 1000;
         const lastSimSongs = await getAiSimilarSongs(trackId, first);
         console.log("LASTSIMSONGS", lastSimSongs);
         const timeout = now - startingTime >= 30;
+        console.log("NOW TIME", now, startingTime, now - startingTime);
 
         if (timeout) {
+          console.log("🕛 TIMEOUT!!!", timeout);
           return [];
         }
 
@@ -486,9 +491,7 @@ export const discoverRouter = createTRPCRouter({
             return enqueRes;
           }
 
-          recursiveGetAiSimilarSongs();
-
-          return;
+          return recursiveGetAiSimilarSongs();
         }
 
         return lastSimSongs;
