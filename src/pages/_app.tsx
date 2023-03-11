@@ -1162,24 +1162,28 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       </button>
 
       {/* loop button */}
-      <button
-        className={cn(
-          "group p-3 md:p-2",
-          scanning && "cursor-not-allowed text-slate-400"
-        )}
-        onClick={() => dispatch({ type: "TOGGLE_LOOP" })}
-      >
-        <Repeat
+      {crrPlayingSong ? (
+        <button
           className={cn(
-            "md:h-4 md:w-4",
-            !loop &&
-              !scanning &&
-              "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            loop &&
-              "text-accentBright md:text-accent md:group-hover:text-accentBright"
+            "group p-3 md:p-2",
+            scanning && "cursor-not-allowed text-slate-400"
           )}
-        />
-      </button>
+          onClick={() => dispatch({ type: "TOGGLE_LOOP" })}
+        >
+          <Repeat
+            className={cn(
+              "h-6 w-6 md:h-4 md:w-4",
+              !loop &&
+                !scanning &&
+                "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
+              loop &&
+                "text-accentBright md:text-accent md:group-hover:text-accentBright"
+            )}
+          />
+        </button>
+      ) : (
+        <span className="h-12 w-12 opacity-0 md:h-8 md:w-8" />
+      )}
     </div>
   );
 };
