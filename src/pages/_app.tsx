@@ -753,14 +753,14 @@ const MusicPlayer = () => {
                     className="disable-focus-visible flex cursor-pointer items-center space-x-3"
                     onClick={() => showToast("Coming Soon!", "warning")}
                   >
-                    <ListPlus />
+                    <ListPlus className="h-5 w-5 shrink-0" />
                     <span className="font-bold">Add to Playlist</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="disable-focus-visible flex cursor-pointer items-center space-x-3"
                     onClick={() => showToast("Coming Soon!", "warning")}
                   >
-                    <Disc />
+                    <Disc className="h-5 w-5 shrink-0" />
                     <span className="font-bold">View Album</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>

@@ -25,7 +25,15 @@ import { Input } from "@/components/ui/core/input";
 import { ListSkeleton, TrackItem } from "./ai";
 import { MusicPlayerContext, PlayerSong } from "../_app";
 import EmptyScreen from "@/components/ui/core/empty-screen";
-import { ArrowRight, CircleSlashed, Music2 } from "lucide-react";
+import {
+  ArrowRight,
+  Bookmark,
+  CircleSlashed,
+  MoreHorizontal,
+  MoreVertical,
+  Music2,
+  Share,
+} from "lucide-react";
 import { SongType } from "@/server/api/routers/discover";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { formatSongDuration } from "@/utils/song-time";
@@ -38,6 +46,12 @@ import TabsList from "@/components/ui/tabsList";
 import showToast from "@/components/ui/core/notifications";
 import Link from "next/link";
 import { Icons } from "@/components/ui/core/icons";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown";
 
 type SpotifyTrackResultType = Omit<
   SongType,
@@ -498,18 +512,50 @@ const Similar = () => {
               <ArrowRight />
             </Button>
           </div>
-          <Link
-            href={`${process.env.NEXT_PUBLIC_VERCEL_URL as string}/spotify`}
-          >
-            <Button
-              size="sm"
-              variant="subtle"
-              className="flex h-10 space-x-2 px-4 py-2"
+
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={cn(
+                "flex h-10 items-center p-3",
+                "rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-800 "
+              )}
             >
-              <Icons.spotify className="h-4 w-4 shrink-0" />
-              <span>Library</span>
-            </Button>
-          </Link>
+              <MoreVertical className="h-5 w-5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="mr-3">
+              <DropdownMenuItem
+                className="disable-focus-visible flex cursor-pointer items-center space-x-3"
+                onClick={() => showToast("Coming Soon!", "warning")}
+              >
+                <Share className="h-5 w-5 shrink-0" />
+                <span>Share</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="disable-focus-visible flex cursor-pointer items-center space-x-3"
+                onClick={() => showToast("Coming Soon!", "warning")}
+              >
+                <Bookmark className="h-5 w-5 shrink-0" />
+                <span>Bookmark</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="disable-focus-visible cursor-pointer"
+                onClick={() => showToast("Coming Soon!", "warning")}
+              >
+                <Link
+                  // href={`${
+                  //   process.env.NEXT_PUBLIC_VERCEL_URL as string
+                  // }/spotify`}
+                  href={`${
+                    process.env.NEXT_PUBLIC_VERCEL_URL as string
+                  }/similar`}
+                  className="flex items-center space-x-3"
+                >
+                  <Icons.spotify className="h-5 w-5 shrink-0" />
+                  <span>Library</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <SelectTrigger className="h-0 border-0 p-0 opacity-0">
           <SelectValue />
