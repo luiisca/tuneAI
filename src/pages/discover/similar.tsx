@@ -159,7 +159,7 @@ const SpotifyItemSkeleton = () => {
 
 const Similar = () => {
   const [state, dispatch] = useReducer(similarReducer, initialState);
-  const { selectedTrackId, selectedTrack, spotify } = state;
+  const { searchValue, selectedTrackId, selectedTrack, spotify } = state;
   const router = useRouter();
 
   const utils = api.useContext();
@@ -319,7 +319,6 @@ const Similar = () => {
   useEffect(() => {
     const query = router.asPath.split("?")[1];
     if (query?.includes("trackid")) {
-      console.log("QUERY", query, typeof query);
       const trackId = new URLSearchParams(query).get("trackid");
       trackId !== "null" &&
         trackId !== "undefined" &&
@@ -504,6 +503,7 @@ const Similar = () => {
             <Button
               size="sm"
               variant="subtle"
+              disabled={!searchValue.trim()}
               onClick={() => {
                 dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
               }}
@@ -713,17 +713,13 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
         loadMore(e);
       }, 1000)}
     >
+      {/* without this the viewport would jump around while loading more (I think)*/}
       <SelectItem value="loading" className="h-0 p-0 opacity-0">
         Loading
       </SelectItem>
       <div>
         {isFetching && !loadingMore && (
-          <>
-            <div className="rounded-sm bg-blue-500 px-4 py-2">
-              is fetching but NOT loading more
-            </div>
-            <ListSkeleton Item={SpotifyItemSkeleton} />
-          </>
+          <ListSkeleton Item={SpotifyItemSkeleton} />
         )}
 
         {tracks && !("message" in tracks) && tracks.length !== 0 && (
@@ -744,12 +740,7 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
               </ul>
             )}
             {isFetching && loadingMore && (
-              <>
-                <div className="rounded-sm bg-red-500 px-4 py-2">
-                  Is fetching and Loadin more
-                </div>
-                <ListSkeleton Item={SpotifyItemSkeleton} />
-              </>
+              <ListSkeleton Item={SpotifyItemSkeleton} />
             )}
           </div>
         )}
