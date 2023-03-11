@@ -627,7 +627,6 @@ const MusicPlayer = () => {
           }}
           onLoadedData={(e) => {
             const target = e.target as HTMLAudioElement;
-            // console.log("ON LOADED DATA", e);
             setDuration(target.duration);
             setCrrSoundPerc(target.volume);
           }}
@@ -641,9 +640,11 @@ const MusicPlayer = () => {
           }}
           onTimeUpdate={(e) => {
             const target = e.target as HTMLAudioElement;
-            const percentage = target.currentTime / duration!;
+            if (duration) {
+              const percentage = target.currentTime / duration;
 
-            crrPlayingSong && setCrrSongPerc(percentage);
+              crrPlayingSong && setCrrSongPerc(percentage);
+            }
           }}
           // onWaiting={() => {
           //   dispatch({ type: "SET_TRACK_READY", ready: false });
@@ -822,20 +823,14 @@ const MusicPlayer = () => {
                 }}
               />
               <div className="flex justify-between text-[0.6875rem] dark:text-slate-50">
-                {scanning ? (
-                  <>
-                    <SkeletonText className="w-8" />
-                    <SkeletonText className="w-8" />
-                  </>
-                ) : (
+                {duration && (
                   <>
                     <span className="block h-4">
-                      {duration &&
-                        formatSongDuration(
-                          convertToSeconds(duration, crrSongPerc)
-                        )}
+                      {formatSongDuration(
+                        convertToSeconds(duration, crrSongPerc)
+                      )}
                     </span>
-                    <span>{duration && formatSongDuration(duration)}</span>
+                    <span>{formatSongDuration(duration)}</span>
                   </>
                 )}
               </div>
@@ -901,19 +896,12 @@ const MusicPlayer = () => {
             <div className="w-full ">
               <PlaybackControls className="mb-2" />
               <div className="flex space-x-2 text-[0.6875rem]">
-                {scanning ? (
-                  <>
-                    <SkeletonText className="w-8 dark:bg-slate-700" />
-                  </>
-                ) : (
-                  <>
-                    <span>
-                      {duration &&
-                        formatSongDuration(
-                          convertToSeconds(duration, crrSongPerc)
-                        )}
-                    </span>
-                  </>
+                {duration && (
+                  <span>
+                    {formatSongDuration(
+                      convertToSeconds(duration, crrSongPerc)
+                    )}
+                  </span>
                 )}
 
                 {/* desktop progress bar */}
@@ -932,15 +920,7 @@ const MusicPlayer = () => {
                     }
                   }}
                 />
-                {scanning ? (
-                  <>
-                    <SkeletonText className="w-8 dark:bg-slate-700" />
-                  </>
-                ) : (
-                  <>
-                    <span>{duration && formatSongDuration(duration)}</span>
-                  </>
-                )}
+                {duration && <span>{formatSongDuration(duration)}</span>}
               </div>
             </div>
             <div className="mr-1 flex w-full items-center justify-end">
