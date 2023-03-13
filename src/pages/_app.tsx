@@ -140,7 +140,7 @@ export type PlayerSong = {
   favourite: boolean;
   audioSrc: string | null;
 };
-const playerPages = ["ai", "similar"] as const;
+const playerPages = ["prompt", "similar"] as const;
 type InitStateType = {
   crrRoute: (typeof playerPages)[number];
   audioRef: React.MutableRefObject<HTMLAudioElement | null>;
@@ -159,7 +159,7 @@ type InitStateType = {
     loadingMore: boolean;
     allResultsShown: boolean;
   };
-  ai: {
+  prompt: {
     songsList: PlayerSong[] | null;
     forwardLoadingMore: boolean;
     resPage: number;
@@ -388,7 +388,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         return {
           ...state,
           crrPlayingPos: action.songPos,
-          crrPlayingSong: songsList ? songsList[0] : null,
+          crrPlayingSong: songsList && songsList[0] ? songsList[0] : null,
           similar: {
             ...state.similar,
             forwardLoadingMore: false,
@@ -558,7 +558,7 @@ const musicPlayerInitState: InitStateType = {
     loadingMore: false,
     allResultsShown: false,
   },
-  ai: {
+  prompt: {
     songsList: null,
     forwardLoadingMore: false,
     resPage: 1,
@@ -583,7 +583,7 @@ const MusicPlayer = () => {
     dispatch,
   } = useContext(MusicPlayerContext);
   useEffect(() => {
-    const crrRoute = router.pathname.includes("similar") ? "similar" : "ai";
+    const crrRoute = router.pathname.includes("similar") ? "similar" : "prompt";
     dispatch({ type: "SAVE_CRR_ROUTE", route: crrRoute });
     dispatch({ type: "RESET_SEARCH", route: crrRoute });
   }, [router.pathname]);

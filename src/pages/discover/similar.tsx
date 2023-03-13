@@ -21,8 +21,7 @@ import {
   SelectViewport,
 } from "@/components/ui/core/select";
 import { Input } from "@/components/ui/core/input";
-// import { MusicPlayerContext } from "../_app";
-import { ListSkeleton, TrackItem } from "./ai";
+import { ListSkeleton, TrackItem } from "./prompt";
 import { MusicPlayerContext, PlayerSong } from "../_app";
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import {
@@ -31,7 +30,7 @@ import {
   CircleSlashed,
   MoreVertical,
   Music2,
-  Share,
+  Users,
 } from "lucide-react";
 import { SongType } from "@/server/api/routers/discover";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
@@ -361,11 +360,14 @@ const Similar = () => {
   });
 
   return (
-    <Shell heading="Discover" subtitle="Find similar songs with AI">
+    <Shell
+      heading="Discover"
+      subtitle="Discover new music from your favorite tracks"
+    >
       <div
         className={cn(
           "border border-gray-100 bg-gray-50 opacity-0 dark:border-slate-900 dark:bg-slate-800",
-          "absolute right-0 top-16 flex min-h-min w-2/5 items-center justify-center overflow-hidden rounded-l-xl opacity-100 sm:top-24 sm:w-1/2 md:top-2 lg:top-8",
+          "absolute right-0 top-16 flex min-h-min w-2/5 items-center justify-center overflow-hidden rounded-l-xl opacity-100 sm:top-24 sm:w-2/5 md:top-2 lg:top-8",
           isFetching &&
             similar.resPage === 1 &&
             "opacity-100 animate-in slide-in-from-right"
@@ -445,7 +447,7 @@ const Similar = () => {
       </div>
       <TabsList
         list={[
-          { href: "/discover/ai", name: "AI" },
+          { href: "/discover/prompt", name: "Prompt" },
           { href: "/discover/similar", name: "Similar" },
         ]}
       />
@@ -486,7 +488,6 @@ const Similar = () => {
             <Input
               tabIndex={1}
               className="mb-2.5"
-              placeholder="Search Spotify tracks"
               onKeyDown={(e) => {
                 if (e.code === "Enter") {
                   dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
@@ -527,7 +528,7 @@ const Similar = () => {
                 className="disable-focus-visible flex cursor-pointer items-center space-x-3"
                 onClick={() => showToast("Coming Soon!", "warning")}
               >
-                <Share className="h-5 w-5 shrink-0" />
+                <Users className="h-5 w-5 shrink-0" />
                 <span>Share</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -547,7 +548,7 @@ const Similar = () => {
                   // }/spotify`}
                   href={`${
                     process.env.NEXT_PUBLIC_VERCEL_URL as string
-                  }/similar`}
+                  }/discover/similar?trackid=${selectedTrackId}`}
                   className="flex items-center space-x-3"
                 >
                   <Icons.spotify className="h-5 w-5 shrink-0" />
@@ -572,8 +573,8 @@ const Similar = () => {
       {!tracks && !isFetching && (
         <EmptyScreen
           Icon={() => <Music2 />}
-          headline="Start searching"
-          description="What are you waiting for"
+          headline="Expand your music horizons"
+          description="Search for any Spotify song and find similar tracks that match your taste."
         />
       )}
       {tracks && !("message" in tracks) && tracks.length !== 0 && (

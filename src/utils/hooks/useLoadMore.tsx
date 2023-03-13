@@ -1,6 +1,4 @@
-import { debounce } from "lodash";
-import { useRouter } from "next/router";
-import { type UIEvent, useCallback, useRef } from "react";
+import { type UIEvent, useCallback } from "react";
 
 const useLoadMore = <T extends HTMLElement>({
   loadingMore,
@@ -41,7 +39,7 @@ const useLoadMore = <T extends HTMLElement>({
         }
       }
     },
-    [isFetching, isFetched, loadingMore, allResultsShown, resPage]
+    [isFetching, isFetched, loadingMore, allResultsShown, resPage, update]
   );
 
   return [loadMore] as const;

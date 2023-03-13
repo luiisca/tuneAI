@@ -23,7 +23,7 @@ export async function getServerSideProps({
   return {
     redirect: {
       permanent: false,
-      destination: "/discover/ai",
+      destination: "/discover/prompt",
     },
   };
 }

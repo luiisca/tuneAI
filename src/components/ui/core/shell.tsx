@@ -12,12 +12,12 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/core/button";
 import { Icons } from "./icons";
 import {
+  Bookmark,
   Compass,
-  Library,
   LogOut,
   LucideIcon,
-  Megaphone,
   MoreVertical,
+  Users,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { signOut, useSession } from "next-auth/react";
@@ -201,17 +201,17 @@ const navigation: NavigationItemType[] = [
     icon: Compass,
   },
   {
-    name: "Share",
-    href: "/share",
-    icon: Megaphone,
+    name: "Community",
+    href: "/community",
+    icon: Users,
   },
   {
-    name: "Prompts library",
-    href: "/prompts",
-    icon: Library,
+    name: "Favorites",
+    href: "/favorites",
+    icon: Bookmark,
   },
   {
-    name: "Spotify library",
+    name: "Spotify",
     href: "/spotify",
     icon: Icons.spotify,
   },

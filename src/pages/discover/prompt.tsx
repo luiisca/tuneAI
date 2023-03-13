@@ -57,31 +57,31 @@ export const ListSkeleton = ({
   );
 };
 
-const Ai = () => {
+const Prompt = () => {
   const [searchValue, setSearchValue] = useState("");
   const utils = api.useContext();
   const router = useRouter();
 
   const { state, dispatch } = useContext(MusicPlayerContext);
 
-  const { ai } = state;
+  const { prompt } = state;
   const songsList = state[state.crrRoute].songsList;
 
   const {
     data: recomSongs,
     isFetching,
     isFetched,
-  } = api.discover.ai.useQuery<SongType[], SongType[]>(
-    { text: searchValue.trim(), first: ai.resQtt },
+  } = api.discover.prompt.useQuery<SongType[], SongType[]>(
+    { text: searchValue.trim(), first: prompt.resQtt },
     {
-      enabled: !!searchValue.trim() && !!ai.resQtt,
+      enabled: !!searchValue.trim() && !!prompt.resQtt,
       keepPreviousData: true,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
       onSuccess: (data) => {
         // console.log("procedure DATA", data);
-        // console.log("resutlsQTT", ai.resQtt);
+        // console.log("resutlsQTT", prompt.resQtt);
         const formatTracksForSongsList = (tracks: SongType[]) => {
           return tracks.map((track, index: number) => ({
             position: (songsList?.length || 0) + index,
@@ -94,19 +94,19 @@ const Ai = () => {
             audioSrc: track.previewUrl || "",
           }));
         };
-        const prevData = utils.discover.ai.getData({
+        const prevData = utils.discover.prompt.getData({
           text: searchValue,
-          first: ai.resQtt - DEFAULT_RESULTS_QTT,
+          first: prompt.resQtt - DEFAULT_RESULTS_QTT,
         }) as SongType[];
 
-        utils.discover.ai.setData(
+        utils.discover.prompt.setData(
           {
             text: searchValue,
-            first: ai.resQtt,
+            first: prompt.resQtt,
           },
           () => {
             if (!("message" in data)) {
-              if (ai.resQtt === DEFAULT_RESULTS_QTT && data) {
+              if (prompt.resQtt === DEFAULT_RESULTS_QTT && data) {
                 dispatch({
                   type: "SAVE_SONGS",
                   songs: [...formatTracksForSongsList(data)],
@@ -151,15 +151,15 @@ const Ai = () => {
   );
 
   useEffect(() => {
-    if (isFetched && !isFetching && ai.loadingMore) {
+    if (isFetched && !isFetching && prompt.loadingMore) {
       dispatch({ type: "STOP_LOADING_MORE_SIMILAR" });
 
-      const prevData = utils.discover.ai.getData({
+      const prevData = utils.discover.prompt.getData({
         text: searchValue,
-        first: ai.resQtt - DEFAULT_RESULTS_QTT,
+        first: prompt.resQtt - DEFAULT_RESULTS_QTT,
       }) as SongType[];
       // console.log("prevData", prevData);
-      if (prevData && ai.forwardLoadingMore) {
+      if (prevData && prompt.forwardLoadingMore) {
         // console.log("ISFETCHED, dispatching", prevData);
         dispatch({
           type: "SELECT_SONG",
@@ -171,7 +171,7 @@ const Ai = () => {
         });
       }
     }
-  }, [isFetched, isFetching, ai.loadingMore]);
+  }, [isFetched, isFetching, prompt.loadingMore]);
 
   useEffect(() => {
     const query = router.asPath.split("?")[1];
@@ -182,29 +182,32 @@ const Ai = () => {
   }, [router.query.prompt]);
 
   const [loadMore] = useLoadMore<HTMLUListElement>({
-    loadingMore: ai.loadingMore,
+    loadingMore: prompt.loadingMore,
     update: () =>
       dispatch({
         type: "SHOW_MORE_SIMILAR",
       }),
     isFetching,
     isFetched,
-    allResultsShown: ai.allResultsShown,
-    resPage: ai.resPage,
+    allResultsShown: prompt.allResultsShown,
+    resPage: prompt.resPage,
   });
 
   return (
-    <Shell heading="Discover" subtitle="Find new songs with AI">
+    <Shell
+      heading="Discover"
+      subtitle="Discover music that matches your mood with AI"
+    >
       <TabsList
         list={[
-          { href: "/discover/ai", name: "AI" },
+          { href: "/discover/prompt", name: "Prompt" },
           { href: "/discover/similar", name: "Similar" },
         ]}
       />
 
       <Input
         defaultValue={searchValue}
-        placeholder="I dont know what to listen. What do you recommend"
+        placeholder="I want to listen to something relaxing before bed"
         onChange={debounce((e) => {
           const { target } = e as Event & { target: HTMLInputElement };
           const text = target.value;
@@ -221,18 +224,20 @@ const Ai = () => {
         }, 800)}
         className="mb-2.5"
       />
-      {isFetching && !ai.loadingMore && <ListSkeleton Item={ItemSkeleton} />}
+      {isFetching && !prompt.loadingMore && (
+        <ListSkeleton Item={ItemSkeleton} />
+      )}
       {!recomSongs && !isFetching && (
         <EmptyScreen
           Icon={() => <Music2 />}
-          headline="Start searching"
-          description="What are you waiting for"
+          headline="Ready to discover new music?"
+          description="Describe your mood and find your jam with AI-powered recommendations."
         />
       )}
 
       {recomSongs && !("message" in recomSongs) && recomSongs.length !== 0 && (
         <div className="h-[calc(100%-13rem)] ">
-          {(!isFetching || (isFetching && ai.loadingMore)) && (
+          {(!isFetching || (isFetching && prompt.loadingMore)) && (
             <ul
               className={cn(
                 "-mr-4 h-full space-y-2 overflow-y-auto pr-4 pb-3 lg:-mr-12 lg:pr-12",
@@ -247,7 +252,7 @@ const Ai = () => {
               {recomSongs.map((song, index) => (
                 <TrackItem track={song} index={index} key={song.id} />
               ))}
-              {isFetching && ai.loadingMore && (
+              {isFetching && prompt.loadingMore && (
                 <ListSkeleton Item={ItemSkeleton} />
               )}
             </ul>
@@ -344,4 +349,4 @@ export const TrackItem = ({
   );
 };
 
-export default Ai;
+export default Prompt;

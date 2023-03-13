@@ -399,7 +399,7 @@ const getSpotifyTracksData = async (tracksId: string, refreshToken: string) => {
 };
 
 export const discoverRouter = createTRPCRouter({
-  ai: publicProcedure
+  prompt: publicProcedure
     .input(
       z.object({
         text: z.string(),

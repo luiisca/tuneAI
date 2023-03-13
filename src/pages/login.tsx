@@ -20,7 +20,7 @@ export default function Login() {
       setErrorMessage("Something went wrong. Please try again");
       // Clean URL to get rid of error query
       router
-        .push(`${WEBAPP_URL!}/login`, undefined, { shallow: true })
+        .push(`${WEBAPP_URL as string}/login`, undefined, { shallow: true })
         .catch(console.error);
     }
   }, [router, router.query?.error]);

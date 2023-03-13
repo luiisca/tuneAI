@@ -6,6 +6,14 @@ import { getAccessToken } from "../utils";
 
 const getSpotifyTrack = async (trackId: string, refreshToken: string) => {
   const accessToken = await getAccessToken(refreshToken);
+  // SPOTIFY ERROR
+  if (!accessToken) {
+    return {
+      code: "AUTH_ERROR",
+      message: "Access token failed",
+    };
+  }
+
   const res = await fetch(`${env.SPOTIFY_API_ENDPOINT}/tracks/${trackId}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -47,6 +55,14 @@ const getSpotifySearchResults = async (
   refreshToken: string
 ) => {
   const accessToken = await getAccessToken(refreshToken);
+  // SPOTIFY ERROR
+  if (!accessToken) {
+    return {
+      code: "AUTH_ERROR",
+      message: "Access token failed",
+    };
+  }
+
   const query_params = new URLSearchParams({
     q: trackName,
     type: "track",
@@ -57,7 +73,7 @@ const getSpotifySearchResults = async (
     `${env.SPOTIFY_API_ENDPOINT}/search?${query_params.toString()}`,
     {
       headers: {
-        Authorization: `Bearer ${accessToken!}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
     }
