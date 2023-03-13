@@ -688,8 +688,8 @@ const MusicPlayer = () => {
                   />
                 </div>
                 {/* Text */}
-                <div className="dark:slate-50 w-[calc(100%-8rem)] text-sm">
-                  <p className="truncate font-bold">{crrPlayingSong.title}</p>
+                <div className="w-[calc(100%-8rem)] text-sm dark:text-slate-50">
+                  <p className="truncate font-bold ">{crrPlayingSong.title}</p>
                   <p className="truncate font-normal">
                     {crrPlayingSong.artists.join(", ")}
                   </p>
@@ -741,7 +741,7 @@ const MusicPlayer = () => {
                 <ChevronDown className="h-8 w-8" />
               </button>
 
-              <p className="dark:slate-50 w-full text-center text-sm font-bold">
+              <p className="w-full text-center text-sm font-bold dark:text-slate-50">
                 Similar songs
               </p>
 
@@ -876,8 +876,10 @@ const MusicPlayer = () => {
 
               {/* Text */}
               {crrPlayingSong && (
-                <div className="dark:slate-50 mx-3.5 w-1/2 text-sm">
-                  <p className="truncate">{crrPlayingSong.title}</p>
+                <div className="mx-3.5 w-1/2 text-sm">
+                  <p className="truncate dark:text-slate-50 ">
+                    {crrPlayingSong.title}
+                  </p>
                   <p className="truncate text-[0.6875rem] text-slate-500 dark:text-slate-400">
                     {crrPlayingSong.artists.join(", ")}
                   </p>

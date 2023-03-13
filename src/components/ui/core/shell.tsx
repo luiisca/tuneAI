@@ -344,12 +344,12 @@ function SideBar() {
       </div>
 
       <div className="mb-2 flex flex-col items-center">
-        <ThemeToggle className="mb-2 lg:hidden" />
+        <ThemeToggle className="mb-2 -translate-y-24 lg:hidden" />
         <span className="hidden w-full lg:inline">
           <UserDropdown />
           {/* <span>User</span> */}
         </span>
-        <span className="hidden md:inline lg:hidden">
+        <span className="hidden md:block lg:hidden">
           <UserDropdown small />
         </span>
       </div>
@@ -387,11 +387,12 @@ export function ShellMain(props: LayoutProps) {
                 </p>
               )}
             </div>
+            {/* not implemented */}
             {props.CTA && (
               <div
                 className={cn(
                   props.backPath ? "relative" : "fixed",
-                  props.CTA && "cta",
+                  // props.CTA && "cta",
                   "relative bottom-auto right-auto mb-4 shrink-0"
                 )}
               >
@@ -486,7 +487,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
 
-  useEffect(() => setMounted(true));
+  useEffect(() => setMounted(true), []);
 
   return (
     <Button

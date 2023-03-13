@@ -40,10 +40,9 @@ SelectViewport.displayName = SelectPrimitive.Viewport.displayName;
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
-    viewportRef?: React.Ref<HTMLDivElement>;
     customViewport?: boolean;
   }
->(({ className, children, viewportRef, customViewport, ...props }, ref) => (
+>(({ className, children, customViewport, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
