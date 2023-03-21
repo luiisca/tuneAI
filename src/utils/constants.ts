@@ -1,4 +1,5 @@
 export const WEBAPP_URL = process.env.NEXT_PUBLIC_VERCEL_URL;
+export const GITHUB_REPO_LINK = "https://github.com/luiisca/tuneAI";
 export const LOGO = "/logo.png";
 export const LOGO_ICON = "/icon.png";
 
