@@ -197,7 +197,7 @@ function UserDropdown({ small }: { small?: boolean }) {
 const navigation: NavigationItemType[] = [
   {
     name: "Discover",
-    href: "/discover",
+    href: "/discover/prompt",
     icon: Compass,
   },
   {

@@ -25,7 +25,7 @@ const Spotify = () => {
         description={
           <span>
             You can help me speed up the process by contributing to my{" "}
-            <Link href={GITHUB_REPO_LINK}>
+            <Link href={GITHUB_REPO_LINK} target="_blank">
               <Button variant="link">Github repo</Button>
             </Link>
           </span>
