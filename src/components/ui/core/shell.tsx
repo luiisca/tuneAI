@@ -320,6 +320,10 @@ const MobileNavigationItem: React.FC<{
 };
 
 function SideBar() {
+  const [mounted, setMounted] = useState(false);
+  const { resolvedTheme } = useTheme();
+  useEffect(() => setMounted(true), []);
+
   return (
     <aside
       className={cn(
@@ -329,16 +333,39 @@ function SideBar() {
     >
       <div className="flex h-0 flex-1 flex-col pt-3 pb-4 lg:pt-5">
         <header className="items-center justify-between md:hidden lg:flex">
-          <Link href="/discover" className="flex justify-center px-3">
-            <Icons.logo />
+          <Link
+            href="/discover/prompt"
+            className={cn(
+              "flex w-full justify-center px-3 pr-12",
+              mounted
+                ? "cursor-pointer opacity-100"
+                : "cursor-default opacity-0"
+            )}
+          >
+            <Icons.logo
+              theme={resolvedTheme === "dark" && mounted ? "dark" : "light"}
+            />
           </Link>
           <ThemeToggle className="absolute right-4 hidden lg:flex" />
         </header>
 
         {/* logo icon for tablet */}
-        <Link href="/discover" className="text-center md:inline lg:hidden">
-          <Icons.logo icon />
-        </Link>
+        <header className="items-center justify-between md:block lg:hidden ">
+          <Link
+            href="/discover/prompt"
+            className={cn(
+              "text-center",
+              mounted
+                ? "cursor-pointer opacity-100"
+                : "cursor-default opacity-0"
+            )}
+          >
+            <Icons.logo
+              icon
+              theme={resolvedTheme === "dark" && mounted ? "dark" : "light"}
+            />
+          </Link>
+        </header>
 
         <Navigation />
       </div>
@@ -463,6 +490,10 @@ function MainContainer({
 }
 
 function TopNav() {
+  const [mounted, setMounted] = useState(false);
+  const { resolvedTheme } = useTheme();
+  useEffect(() => setMounted(true), []);
+
   return (
     <>
       <nav
@@ -471,8 +502,16 @@ function TopNav() {
           "border-b-slate-200 bg-white dark:border-b-slate-700 dark:bg-slate-900"
         )}
       >
-        <Link href="/discover">
-          <Icons.logo />
+        <Link
+          href="/discover/prompt"
+          className={cn(
+            "w-32",
+            mounted ? "cursor-pointer opacity-100" : "cursor-default opacity-0"
+          )}
+        >
+          <Icons.logo
+            theme={resolvedTheme === "dark" && mounted ? "dark" : "light"}
+          />
         </Link>
         <div className="flex items-center gap-2 self-center">
           <ThemeToggle className="shrink-0 md:hidden" />

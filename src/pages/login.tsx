@@ -7,7 +7,6 @@ import { GITHUB_REPO_LINK, WEBAPP_URL } from "@/utils/constants";
 import { Github } from "lucide-react";
 import type { GetServerSidePropsContext } from "next";
 import { signIn } from "next-auth/react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";

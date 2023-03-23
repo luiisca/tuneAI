@@ -1,8 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 import Image from "next/image";
-import { LOGO } from "@/utils/constants";
 import { cn } from "@/utils/cn";
+import { Icons } from "./core/icons";
+import { useTheme } from "next-themes";
+import { shimmer, toBase64 } from "@/utils/blur-effect";
+import { SkeletonContainer } from "./skeleton";
 
 interface Props {
   footerText?: React.ReactNode | string;
@@ -13,10 +16,14 @@ interface Props {
 }
 
 export default function AuthContainer(props: React.PropsWithChildren<Props>) {
+  const [mounted, setMounted] = useState(false);
+  const { resolvedTheme } = useTheme();
+  useEffect(() => setMounted(true), []);
+
   return (
     <div
       className={cn(
-        "flex h-screen w-full flex-col bg-[#f3f4f6] sm:flex-row",
+        "flex h-screen w-full flex-col bg-gray-100 sm:flex-row",
         "dark:bg-gradient-to-b dark:from-slate-800 dark:to-slate-900"
       )}
     >
@@ -26,15 +33,13 @@ export default function AuthContainer(props: React.PropsWithChildren<Props>) {
           "sm:h-full sm:w-1/2 lg:py-12 lg:px-8"
         )}
       >
-        {props.showLogo && (
-          <Image
-            src={LOGO}
-            alt="TuneAI Logo"
-            height={78}
-            width={256}
-            className="mx-auto mb-auto h-auto w-1/12 min-w-[10rem] dark:invert"
-          />
-        )}
+        <Icons.logo
+          theme={mounted && resolvedTheme === "dark" ? "dark" : "light"}
+          className={cn(
+            "mx-auto mb-auto h-auto w-1/12 min-w-[8rem]",
+            mounted ? "cursor-pointer opacity-100" : "cursor-default opacity-0"
+          )}
+        />
         <div
           className={cn(
             props.showLogo ? "text-center" : "",
@@ -52,7 +57,7 @@ export default function AuthContainer(props: React.PropsWithChildren<Props>) {
             </h2>
           )}
         </div>
-        <div className="mt-4 mb-auto dark:mt-0 sm:mx-auto sm:w-full sm:max-w-md lg:mt-8">
+        <div className="mt-4 mb-auto sm:mx-auto sm:w-full sm:max-w-md lg:mt-8">
           <div className="mx-2 p-4 py-0 md:px-10">{props.children}</div>
         </div>
       </div>
@@ -62,6 +67,11 @@ export default function AuthContainer(props: React.PropsWithChildren<Props>) {
             src="/login-cover.webp"
             alt="trees"
             fill
+            placeholder="blur"
+            blurDataURL={`data:image/svg+xml;base64,${toBase64(
+              shimmer(700, 475)
+            )}`}
+            sizes="50vw"
             className="object-cover object-center"
           />
         </div>

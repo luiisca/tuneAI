@@ -1380,7 +1380,7 @@ const MyApp: AppType<{ session: Session | null }> = ({
           <MusicPlayerProvider>
             <Component {...pageProps} />
             <MusicPlayer />
-            <ReactQueryDevtools initialIsOpen={true} />
+            {/* <ReactQueryDevtools initialIsOpen={true} /> */}
           </MusicPlayerProvider>
         </SessionProvider>
       </ThemeProvider>
