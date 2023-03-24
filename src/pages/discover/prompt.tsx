@@ -7,26 +7,24 @@ import { useContext, useEffect, useState, type UIEvent } from "react";
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import { CircleSlashed, Music2 } from "lucide-react";
 import { SkeletonContainer, SkeletonText } from "@/components/ui/skeleton";
-import { FavouriteBttn, MusicPlayerContext, ScanSimilarsBttn } from "../_app";
+import { MusicPlayerContext } from "../_app";
 import { cn } from "@/utils/cn";
 import showToast from "@/components/ui/core/notifications";
-import Image from "next/image";
-import { formatSongDuration } from "@/utils/song-time";
-import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { DEFAULT_RESULTS_QTT, LOADED_MORE_ERROR_MSG } from "@/utils/constants";
 import type { SongType } from "@/server/api/routers/discover";
 import useLoadMore from "@/utils/hooks/useLoadMore";
 import TabsList from "@/components/ui/tabsList";
 import { useRouter } from "next/router";
+import { TrackItem } from "@/components/track-item";
 
 export const ItemSkeleton = ({ time = true }: { time: boolean }) => {
   return (
-    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 px-4 dark:bg-slate-900">
+    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 py-2 dark:bg-slate-900 md:px-4">
       <div className="flex h-full w-full items-center space-x-4">
         {/* number */}
-        <SkeletonText className="my-auto h-1/3 w-4" />
+        <SkeletonText className="my-auto hidden h-1/3 w-4 md:block" />
         {/* image */}
-        <SkeletonText className="h-10 w-10 shrink-0" />
+        <SkeletonText className="!ml-0 h-10 w-10 shrink-0 md:!ml-4" />
         <div className="flex w-full flex-col justify-center space-y-1">
           {/* title */}
           <SkeletonText className="h-5 w-1/3" />
@@ -267,85 +265,6 @@ const Prompt = () => {
         />
       )}
     </Shell>
-  );
-};
-
-export const TrackItem = ({
-  index,
-  track,
-}: {
-  index: number;
-  track:
-    | SongType
-    | Omit<SongType, "genres" | "moods" | "instruments" | "musicalEra">;
-}) => {
-  const { dispatch } = useContext(MusicPlayerContext);
-
-  return (
-    <li
-      onClick={(e) => {
-        const target = e.target as HTMLLIElement;
-        if (!target.closest("button")) {
-          if (track.previewUrl) {
-            dispatch({
-              type: "SELECT_SONG",
-              songPos: index,
-            });
-          } else {
-            showToast("Cannot play. Sorry", "error");
-          }
-        }
-      }}
-      className={cn(
-        "group flex h-14 cursor-pointer items-center justify-between rounded-md p-2 px-4 hover:bg-slate-100 dark:hover:bg-slate-700",
-        !track.previewUrl && "cursor-not-allowed opacity-40"
-      )}
-    >
-      <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
-        <span className="flex w-4 shrink-0  items-center justify-center font-semibold">
-          {index + 1}
-        </span>
-        <div className="relative h-10 w-10 shrink-0">
-          <Image
-            alt={`${track.title} playing`}
-            fill
-            placeholder="blur"
-            blurDataURL={`data:image/svg+xml;base64,${toBase64(
-              shimmer(700, 475)
-            )}`}
-            sizes="20vw"
-            src={track.coverUrl || "/defaultSongCover.jpeg"}
-            className="object-cover"
-          />
-        </div>
-        <div className="overflow-hidden">
-          <p className="truncate">{track.title}</p>
-          <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-            {track.artists.join(", ")}
-          </p>
-        </div>
-      </div>
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center">
-          {track.previewUrl && (
-            <ScanSimilarsBttn
-              trackPos={index}
-              trackId={track.id}
-              className="group-hover:opacity-100 lg:opacity-0"
-            />
-          )}
-          <FavouriteBttn
-            className="group group-hover:opacity-100 lg:opacity-0"
-            iconClassName="h-4 w-4"
-            songPos={index}
-            disabled={!track.previewUrl}
-          />
-        </div>
-        <span className="flex w-[5ch] justify-end text-end text-sm tabular-nums text-slate-600 dark:text-slate-300">
-          {formatSongDuration(track.duration)}
-        </span>
-      </div>
-    </li>
   );
 };
 

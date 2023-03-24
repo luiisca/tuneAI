@@ -21,7 +21,7 @@ import {
   SelectViewport,
 } from "@/components/ui/core/select";
 import { Input } from "@/components/ui/core/input";
-import { ListSkeleton, TrackItem } from "./prompt";
+import { ListSkeleton } from "./prompt";
 import { MusicPlayerContext, PlayerSong } from "../_app";
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import {
@@ -50,6 +50,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown";
+import { TrackItem } from "@/components/track-item";
 
 type SpotifyTrackResultType = Omit<
   SongType,
