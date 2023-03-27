@@ -544,9 +544,6 @@ const Similar = () => {
                 onClick={() => showToast("Coming Soon!", "warning")}
               >
                 <Link
-                  // href={`${
-                  //   process.env.NEXT_PUBLIC_VERCEL_URL as string
-                  // }/spotify`}
                   href={`${
                     process.env.NEXT_PUBLIC_VERCEL_URL as string
                   }/discover/similar?trackid=${selectedTrackId}`}

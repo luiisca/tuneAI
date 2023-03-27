@@ -10,6 +10,14 @@ import type { SongType } from "@/server/api/routers/discover";
 import { useContext } from "react";
 import showToast from "./ui/core/notifications";
 import { cn } from "@/utils/cn";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown";
+import { ExternalLink, MoreHorizontal } from "lucide-react";
+import Link from "next/link";
 
 export const TrackItem = ({
   index,
@@ -23,7 +31,7 @@ export const TrackItem = ({
   const { dispatch } = useContext(MusicPlayerContext);
 
   return (
-    <li
+    <div
       onClick={(e) => {
         const target = e.target as HTMLLIElement;
         if (!target.closest("button")) {
@@ -72,20 +80,56 @@ export const TrackItem = ({
             <ScanSimilarsBttn
               trackPos={index}
               trackId={track.id}
-              className="group-hover:opacity-100 lg:opacity-0"
+              className="hidden group-hover:opacity-100 xl:block xl:opacity-0"
             />
           )}
           <FavouriteBttn
-            className="group group-hover:opacity-100 lg:opacity-0"
+            className="group group-hover:opacity-100 xl:opacity-0"
             iconClassName="h-4 w-4"
             songPos={index}
             disabled={!track.previewUrl}
           />
         </div>
-        <span className="flex w-[5ch] justify-end text-end text-sm tabular-nums text-slate-600 dark:text-slate-300">
+        <span className="hidden w-[5ch] justify-end text-end text-sm tabular-nums text-slate-600 dark:text-slate-300 md:flex">
           {formatSongDuration(track.duration)}
         </span>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className={cn(
+              "flex h-10 items-center p-3 xl:hidden",
+              "rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-800 "
+            )}
+          >
+            <MoreHorizontal className="h-5 w-5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="mr-3">
+            {track.previewUrl && (
+              <DropdownMenuItem
+                asChild
+                className="cursor-pointer items-center space-x-3"
+              >
+                <ScanSimilarsBttn
+                  trackPos={index}
+                  trackId={track.id}
+                  className="w-full"
+                  iconClassName="h-5 w-5 font-semibold"
+                  text="Find similar songs"
+                />
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              asChild
+              className="group flex cursor-pointer items-center space-x-3"
+            >
+              <Link href={track.spotifyUrl} target="_blank">
+                <ExternalLink className="h-5 w-5 shrink-0 text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50" />
+
+                <span>Listen on Spotify</span>
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-    </li>
+    </div>
   );
 };

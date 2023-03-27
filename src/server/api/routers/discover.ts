@@ -1,5 +1,5 @@
 import { env } from "@/env/server.mjs";
-import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
+import { DEFAULT_RESULTS_QTT, NOT_ANALYZED_ERR_CODE } from "@/utils/constants";
 import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
@@ -152,6 +152,7 @@ interface enqueuedSpotifyTrack {
 
 export type SongType = {
   id: string;
+  spotifyUrl: string;
   title: string;
   artists: string[];
   previewUrl: string | null;
@@ -432,16 +433,17 @@ export const discoverRouter = createTRPCRouter({
 
           return {
             id: recomSong!.cursor,
+            spotifyUrl: track.external_urls.spotify,
             genres: recomSong!.node.audioAnalysisV6.result.genreTags,
             moods: recomSong!.node.audioAnalysisV6.result.moodTags,
             instruments: recomSong!.node.audioAnalysisV6.result.instrumentTags,
             musicalEra: recomSong!.node.audioAnalysisV6.result.musicalEraTag,
             duration: track.duration_ms / 1000,
             coverUrl:
-              track?.album?.images[0]?.url ||
-              track?.album?.images[1]?.url ||
+              track.album?.images[0]?.url ||
+              track.album?.images[1]?.url ||
               "/defaultSongCover.jpeg",
-            previewUrl: track?.preview_url,
+            previewUrl: track.preview_url,
             title: track.name,
             artists: track.artists.map((artist) => artist.name),
           };
@@ -464,7 +466,6 @@ export const discoverRouter = createTRPCRouter({
 
       const startingTime = Date.now() / 1000;
       console.log("STARTING TIME", startingTime);
-      const NOT_ANALYZED_ERR_CODE = "trackNotAnalyzed";
 
       const recursiveGetAiSimilarSongs = async (): Promise<
         (SongResult | null)[] | { message: string }
@@ -523,6 +524,7 @@ export const discoverRouter = createTRPCRouter({
 
             return {
               id: simSong!.cursor,
+              spotifyUrl: track?.external_urls.spotify,
               genres: simSong!.node.audioAnalysisV6.result.genreTags,
               moods: simSong!.node.audioAnalysisV6.result.moodTags,
               instruments: simSong!.node.audioAnalysisV6.result.instrumentTags,

@@ -50,7 +50,7 @@ import {
 } from "@/utils/constants";
 import { Progress } from "@/components/ui/progress";
 import { convertToSeconds, formatSongDuration } from "@/utils/song-time";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+// import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useRouter } from "next/router";
 import Link from "next/link";
 const fontSans = FontSans({
@@ -1246,6 +1246,7 @@ export const ScanSimilarsBttn = ({
   musicPlayer,
   className,
   iconClassName,
+  text,
   ...props
 }: React.ComponentProps<typeof Button> & {
   trackPos?: number;
@@ -1253,6 +1254,7 @@ export const ScanSimilarsBttn = ({
   musicPlayer?: boolean;
   className?: string;
   iconClassName?: string;
+  text?: React.ReactNode;
 }) => {
   const { state, dispatch } = useContext(MusicPlayerContext);
 
@@ -1299,6 +1301,7 @@ export const ScanSimilarsBttn = ({
             iconClassName
           )}
         />
+        {text && <span>{text}</span>}
       </button>
     </Link>
   );
