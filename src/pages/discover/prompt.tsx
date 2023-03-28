@@ -247,7 +247,7 @@ const Prompt = () => {
     >
       <TabsList
         list={[
-          { href: router.asPath, name: "Prompt" },
+          { href: "/discover/prompt", name: "Prompt" },
           { href: "/discover/similar", name: "Similar" },
         ]}
       />

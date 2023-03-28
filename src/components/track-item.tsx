@@ -34,7 +34,9 @@ export const TrackItem = ({
     <div
       onClick={(e) => {
         const target = e.target as HTMLLIElement;
+        console.log("🤡Clicked!", target);
         if (!target.closest("button")) {
+          console.log("🆚Not bottom clicked, selecting");
           if (track.previewUrl) {
             dispatch({
               type: "SELECT_SONG",
@@ -46,11 +48,16 @@ export const TrackItem = ({
         }
       }}
       className={cn(
-        "group flex h-14 cursor-pointer items-center justify-between rounded-md py-2 md:px-4 md:hover:bg-slate-100 md:dark:hover:bg-slate-700",
-        !track.previewUrl && "cursor-not-allowed opacity-40"
+        "group/track flex h-14 cursor-pointer items-center justify-between rounded-md py-2 md:px-4 md:hover:bg-slate-100 md:dark:hover:bg-slate-700",
+        !track.previewUrl && "cursor-default "
       )}
     >
-      <div className="flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5">
+      <div
+        className={cn(
+          "flex h-full w-1/2 space-x-4 md:w-2/3 lg:w-4/5",
+          !track.previewUrl && "opacity-40"
+        )}
+      >
         <span className="hidden w-4 shrink-0 items-center justify-center font-semibold md:flex">
           {index + 1}
         </span>
@@ -74,23 +81,32 @@ export const TrackItem = ({
           </p>
         </div>
       </div>
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-2">
         <div className="flex items-center">
           {track.previewUrl && (
-            <ScanSimilarsBttn
-              trackPos={index}
-              trackId={track.id}
-              className="hidden group-hover:opacity-100 xl:block xl:opacity-0"
-            />
+            <ScanSimilarsBttn trackPos={index} trackId={track.id} />
           )}
+
+          <Link
+            href={track.spotifyUrl}
+            target="_blank"
+            className="group hidden p-2 xl:group-hover/track:block"
+          >
+            <ExternalLink className="h-4 w-4 text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50" />
+          </Link>
           <FavouriteBttn
-            className="group group-hover:opacity-100 xl:opacity-0"
+            className="group"
             iconClassName="h-4 w-4"
             songPos={index}
-            disabled={!track.previewUrl}
           />
         </div>
-        <span className="hidden w-[5ch] justify-end text-end text-sm tabular-nums text-slate-600 dark:text-slate-300 md:flex">
+        <span
+          className={cn(
+            "hidden w-[5ch] justify-end text-end text-sm tabular-nums text-slate-600 dark:text-slate-300 md:flex",
+
+            !track.previewUrl && "opacity-40"
+          )}
+        >
           {formatSongDuration(track.duration)}
         </span>
         <DropdownMenu>
@@ -105,13 +121,15 @@ export const TrackItem = ({
           <DropdownMenuContent className="mr-3">
             {track.previewUrl && (
               <DropdownMenuItem
-                asChild
-                className="cursor-pointer items-center space-x-3"
+                className="cursor-pointer "
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
               >
                 <ScanSimilarsBttn
                   trackPos={index}
                   trackId={track.id}
-                  className="w-full"
+                  className="flex w-full items-center space-x-3 !p-0"
                   iconClassName="h-5 w-5 font-semibold"
                   text="Find similar songs"
                 />
@@ -119,6 +137,9 @@ export const TrackItem = ({
             )}
             <DropdownMenuItem
               asChild
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
               className="group flex cursor-pointer items-center space-x-3"
             >
               <Link href={track.spotifyUrl} target="_blank">

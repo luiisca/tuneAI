@@ -1270,7 +1270,6 @@ export const ScanSimilarsBttn = ({
 
   return (
     <Link
-      shallow={true}
       href={`${process.env.NEXT_PUBLIC_VERCEL_URL}/discover/similar?trackid=${trackId}`}
       onClick={() => {
         if (!scanning) {
@@ -1283,6 +1282,7 @@ export const ScanSimilarsBttn = ({
           dispatch({ type: "RESET_SIMILAR_SONGS", onlyResQtt: true });
         }
       }}
+      className={!text ? "hidden xl:group-hover/track:block" : ""}
     >
       <button
         {...props}
@@ -1294,7 +1294,7 @@ export const ScanSimilarsBttn = ({
       >
         <ScanLine
           className={cn(
-            "h-4 w-4",
+            "h-4 w-4 stroke-[2.2]",
             "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
             scanning && "!text-accentBright",
             iconClassName
@@ -1352,7 +1352,6 @@ export const FavouriteBttn = ({
     >
       <Heart
         className={cn(
-          "text-slate-600 dark:text-slate-400",
           !disabled &&
             !favourite &&
             "group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
