@@ -160,6 +160,7 @@ const SpotifyItemSkeleton = () => {
 const Similar = () => {
   const [state, dispatch] = useReducer(similarReducer, initialState);
   const { searchValue, selectedTrackId, selectedTrack, spotify } = state;
+  const [showHeading, setShowHeading] = useState(true);
   const router = useRouter();
 
   const utils = api.useContext();
@@ -363,20 +364,28 @@ const Similar = () => {
   return (
     <Shell
       heading="Discover"
+      headingClassname={cn(
+        showHeading ? "h-auto opacity-100" : "h-0 m-0 -z-10"
+      )}
       subtitle="Discover new music from your favorite tracks"
     >
       <div
         className={cn(
           "border border-gray-100 bg-gray-50 opacity-0 dark:border-slate-900 dark:bg-slate-800",
-          "absolute right-0 top-16 flex min-h-min w-2/5 items-center justify-center overflow-hidden rounded-l-xl opacity-100 sm:top-24 sm:w-2/5 md:top-2 lg:top-8",
+          "absolute right-0 top-16 flex min-h-min w-2/5 items-center justify-center overflow-hidden rounded-l-xl opacity-100 sm:w-2/5 md:top-2 lg:top-8",
           isFetching &&
             similar.resPage === 1 &&
-            "opacity-100 animate-in slide-in-from-right"
+            "opacity-100 animate-in slide-in-from-right",
+          showHeading ? "sm:top-20" : "sm:top-[5.5rem] md:top-1 lg:top-2"
         )}
       >
         {isFetching && similar.resPage === 1 && (
           <SkeletonContainer className="w-full">
-            <div className="flex h-16 animate-pulse items-center justify-between space-x-2 py-2 pl-4 dark:bg-slate-900 md:h-20">
+            <div
+              className={cn(
+                "flex animate-pulse items-center justify-between space-x-2 py-2 pl-4 transition-all dark:bg-slate-900"
+              )}
+            >
               <div className="flex h-full w-full flex-row-reverse items-center justify-between space-x-4">
                 {/* image */}
                 <SkeletonText className="hidden shrink-0 rounded-none sm:block sm:h-16 sm:w-16 md:h-20 md:w-20" />
@@ -423,7 +432,14 @@ const Similar = () => {
             )}
           >
             <div className="flex h-full w-full flex-row-reverse items-center justify-between space-x-4">
-              <div className="relative hidden shrink-0 sm:block sm:h-16 sm:w-16 md:h-20 md:w-20">
+              <div
+                className={cn(
+                  "relative hidden shrink-0 transition-all sm:block ",
+                  showHeading
+                    ? "sm:h-16 sm:w-16 md:h-20 md:w-20"
+                    : "sm:h-12 sm:w-12 lg:h-16 lg:w-16"
+                )}
+              >
                 <Image
                   alt={`${selectedTrack.title} playing`}
                   fill
@@ -436,7 +452,12 @@ const Similar = () => {
                   className="object-cover"
                 />
               </div>
-              <div className="flex h-16 w-full flex-col justify-center overflow-hidden sm:w-4/5 md:h-20">
+              <div
+                className={cn(
+                  "flex w-full flex-col justify-center overflow-hidden transition-all sm:h-auto sm:w-4/5",
+                  showHeading ? "h-16" : "h-12"
+                )}
+              >
                 <p className="truncate">{selectedTrack.title}</p>
                 <p className="truncate text-sm text-slate-500 dark:text-slate-400">
                   {selectedTrack.artists.join(", ")}
@@ -458,30 +479,32 @@ const Similar = () => {
         }
         open={spotify.listOpen}
         onValueChange={(value) => {
-          const track = JSON.parse(value) as SpotifyTrackResultType;
-          console.log("ONVALUECHANGE SElECT", track);
-          router.push({
-            pathname: router.pathname,
-            query: {
-              trackid: track.id,
-            },
-          });
-          if (!track.previewUrl) {
-            showToast("Cannot play. Sorry", "error");
+          if (!(value === "loading")) {
+            const track = JSON.parse(value) as SpotifyTrackResultType;
+            console.log("ONVALUECHANGE SElECT", track);
+            router.push({
+              pathname: router.pathname,
+              query: {
+                trackid: track.id,
+              },
+            });
+            if (!track.previewUrl) {
+              showToast("Cannot play. Sorry", "error");
 
-            return;
+              return;
+            }
+
+            dispatch({
+              type: "SELECT_TRACK",
+              track: {
+                ...track,
+                position: 0,
+                favourite: false,
+                scanning: false,
+                audioSrc: track.previewUrl,
+              },
+            });
           }
-
-          dispatch({
-            type: "SELECT_TRACK",
-            track: {
-              ...track,
-              position: 0,
-              favourite: false,
-              scanning: false,
-              audioSrc: track.previewUrl,
-            },
-          });
         }}
       >
         <div className="flex space-x-2">
@@ -490,7 +513,19 @@ const Similar = () => {
               tabIndex={1}
               className="mb-2.5"
               onKeyDown={(e) => {
-                if (e.code === "Enter") {
+                const { target } = e as unknown as Event & {
+                  target: HTMLInputElement;
+                };
+                console.log(
+                  target.value,
+                  target.value.trim(),
+                  !!target.value.trim()
+                );
+                if (target.value.trim() && e.code === "Enter") {
+                  console.log(
+                    "realyy?",
+                    target.value.trim() && e.code === "Enter"
+                  );
                   dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
                 }
               }}
@@ -498,8 +533,10 @@ const Similar = () => {
                 const { target } = e as Event & { target: HTMLInputElement };
                 const text = target.value.trim();
 
-                dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
-                dispatch({ type: "RESET_SEARCH", searchValue: text });
+                if (text) {
+                  dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
+                  dispatch({ type: "RESET_SEARCH", searchValue: text });
+                }
               }, 800)}
             />
             <Button
@@ -576,7 +613,7 @@ const Similar = () => {
         />
       )}
       {tracks && !("message" in tracks) && tracks.length !== 0 && (
-        <div className="h-[calc(100%-13rem)] ">
+        <div className="h-[calc(100%-10.5rem)] sm:h-[calc(100%-12.5rem)] md:h-[calc(100%-7.5rem)] lg:h-[calc(100%-4.5rem)]">
           {/* @TODO: take a look at this condition, might be unncessary */}
           {(!isFetching || (isFetching && similar.loadingMore)) && (
             <ul
@@ -586,9 +623,17 @@ const Similar = () => {
                 "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-rounded-md",
                 "scrollbar-thumb-accent hover:scrollbar-thumb-accentBright"
               )}
-              onScroll={debounce((e: UIEvent<HTMLUListElement>) => {
-                loadMore(e);
-              }, 1000)}
+              onScroll={(e) => {
+                debounce((e: UIEvent<HTMLUListElement>) => {
+                  loadMore(e);
+                }, 1000)(e);
+
+                const target = e.target as HTMLUListElement;
+                setShowHeading(
+                  Math.floor(target.scrollTop) >= 0 &&
+                    Math.floor(target.scrollTop) <= 10
+                );
+              }}
             >
               {tracks.map((track, index) => (
                 <TrackItem index={index} track={track} key={track.id} />

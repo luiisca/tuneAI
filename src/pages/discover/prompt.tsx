@@ -57,6 +57,7 @@ export const ListSkeleton = ({
 
 const Prompt = () => {
   const [searchValue, setSearchValue] = useState("");
+  const [showHeading, setShowHeading] = useState(true);
   const utils = api.useContext();
   const router = useRouter();
 
@@ -194,6 +195,9 @@ const Prompt = () => {
   return (
     <Shell
       heading="Discover"
+      headingClassname={cn(
+        showHeading ? "h-auto opacity-100" : "h-0 m-0 -z-10"
+      )}
       subtitle="Discover music that matches your mood with AI"
     >
       <TabsList
@@ -212,13 +216,13 @@ const Prompt = () => {
           if (text.trim()) {
             setSearchValue(text.trim());
             dispatch({ type: "RESET_SEARCH" });
+            router.push({
+              pathname: router.pathname,
+              query: {
+                prompt: text.trim(),
+              },
+            });
           }
-          router.push({
-            pathname: router.pathname,
-            query: {
-              prompt: text.trim(),
-            },
-          });
         }, 800)}
         className="mb-2.5"
       />
@@ -234,7 +238,7 @@ const Prompt = () => {
       )}
 
       {recomSongs && !("message" in recomSongs) && recomSongs.length !== 0 && (
-        <div className="h-[calc(100%-13rem)] ">
+        <div className="h-[calc(100%-10.5rem)] sm:h-[calc(100%-12.5rem)] md:h-[calc(100%-7.5rem)] lg:h-[calc(100%-4.5rem)]">
           {(!isFetching || (isFetching && prompt.loadingMore)) && (
             <ul
               className={cn(
@@ -243,9 +247,17 @@ const Prompt = () => {
                 "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 scrollbar-thumb-rounded-md",
                 "dark:scrollbar-thumb-accent dark:hover:scrollbar-thumb-accentBright"
               )}
-              onScroll={debounce((e: UIEvent<HTMLUListElement>) => {
-                loadMore(e);
-              }, 1000)}
+              onScroll={(e) => {
+                debounce((e: UIEvent<HTMLUListElement>) => {
+                  loadMore(e);
+                }, 1000)(e);
+
+                const target = e.target as HTMLUListElement;
+                setShowHeading(
+                  Math.floor(target.scrollTop) >= 0 &&
+                    Math.floor(target.scrollTop) <= 10
+                );
+              }}
             >
               {recomSongs.map((song, index) => (
                 <TrackItem track={song} index={index} key={song.id} />

@@ -83,6 +83,7 @@ type LayoutProps = {
   centered?: boolean;
   title?: string;
   heading?: ReactNode;
+  headingClassname?: string;
   subtitle?: ReactNode;
   children: ReactNode;
   CTA?: ReactNode;
@@ -106,7 +107,7 @@ export default function Shell(props: LayoutProps) {
   return (
     <div className="flex h-screen overflow-hidden">
       {props.SidebarContainer || <SideBar />}
-      <div className="mb-[4.5rem] flex w-0 flex-1 flex-col overflow-hidden">
+      <div className="mb-20 flex w-0 flex-1 flex-col overflow-hidden lg:mb-[6.5rem]">
         <MainContainer {...props} />
       </div>
     </div>
@@ -392,7 +393,8 @@ export function ShellMain(props: LayoutProps) {
           <header
             className={cn(
               props.large && "py-8",
-              "mb-4 flex w-full items-center pt-4 md:p-0"
+              "mb-4 flex w-full items-center pt-4 transition-all md:p-0",
+              props.headingClassname
             )}
           >
             {props.HeadingLeftIcon && (
@@ -473,11 +475,13 @@ function MainContainer({
       />
       {SettingsSidebarContainerProp}
 
-      <div className="flex h-full flex-col px-4 pt-2 lg:py-8 lg:px-12">
+      <div className="flex h-full flex-col bg-white px-4 pt-2 dark:bg-slate-900 lg:py-8 lg:px-12">
         {/* add padding to top for mobile when App Bar is fixed */}
         <div className="pt-10 sm:hidden" />
         {!props.withoutMain ? (
-          <ShellMain {...props}>{props.children}</ShellMain>
+          <ShellMain {...props}>
+            <div className="h-full transition-all">{props.children}</div>
+          </ShellMain>
         ) : (
           props.children
         )}

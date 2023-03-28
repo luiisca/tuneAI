@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown";
-import { ExternalLink, MoreHorizontal } from "lucide-react";
+import { ExternalLink, MoreVertical } from "lucide-react";
 import Link from "next/link";
 
 export const TrackItem = ({
@@ -97,10 +97,10 @@ export const TrackItem = ({
           <DropdownMenuTrigger
             className={cn(
               "flex h-10 items-center p-3 xl:hidden",
-              "rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-800 "
+              "rounded-md text-slate-700 hover:text-slate-800 dark:text-slate-100 dark:hover:text-slate-200 "
             )}
           >
-            <MoreHorizontal className="h-5 w-5" />
+            <MoreVertical className="h-5 w-5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent className="mr-3">
             {track.previewUrl && (
