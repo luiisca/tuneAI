@@ -478,7 +478,6 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         state.audioRef.current.src = "";
         state.audioRef.current.currentTime = 0;
       }
-      console.log("is reset serach running");
 
       return {
         ...state,

@@ -24,14 +24,7 @@ import { Input } from "@/components/ui/core/input";
 import { ListSkeleton } from "./prompt";
 import { MusicPlayerContext, PlayerSong } from "../_app";
 import EmptyScreen from "@/components/ui/core/empty-screen";
-import {
-  ArrowRight,
-  Bookmark,
-  CircleSlashed,
-  MoreVertical,
-  Music2,
-  Users,
-} from "lucide-react";
+import { ArrowRight, CircleSlashed, Music2 } from "lucide-react";
 import { SongType } from "@/server/api/routers/discover";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { formatSongDuration } from "@/utils/song-time";
@@ -42,14 +35,6 @@ import { Button } from "@/components/ui/core/button";
 import { useRouter } from "next/router";
 import TabsList from "@/components/ui/tabsList";
 import showToast from "@/components/ui/core/notifications";
-import Link from "next/link";
-import { Icons } from "@/components/ui/core/icons";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown";
 import { TrackItem } from "@/components/track-item";
 
 type SpotifyTrackResultType = Omit<
@@ -160,9 +145,11 @@ const SpotifyItemSkeleton = () => {
 const Similar = () => {
   const [state, dispatch] = useReducer(similarReducer, initialState);
   const { searchValue, selectedTrackId, selectedTrack, spotify } = state;
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [searchEnabled, setSearchEnabled] = useState(false);
   const [showHeading, setShowHeading] = useState(true);
-  const router = useRouter();
 
+  const router = useRouter();
   const utils = api.useContext();
 
   const { state: statePlayer, dispatch: dispatchPlayer } =
@@ -170,6 +157,16 @@ const Similar = () => {
 
   const { similar } = statePlayer;
   const songsList = statePlayer[statePlayer.crrRoute].songsList;
+
+  const search = useCallback(
+    (searchQuery: string) => {
+      if (searchValue !== searchQuery) {
+        dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
+        dispatch({ type: "RESET_SEARCH", searchValue: searchQuery });
+      }
+    },
+    [searchValue]
+  );
 
   const {} = api.spotify.singleTrack.useQuery(
     {
@@ -507,91 +504,34 @@ const Similar = () => {
           }
         }}
       >
-        <div className="flex space-x-2">
-          <div className="relative w-full">
-            <Input
-              tabIndex={1}
-              className="mb-2.5"
-              onKeyDown={(e) => {
-                const { target } = e as unknown as Event & {
-                  target: HTMLInputElement;
-                };
-                console.log(
-                  target.value,
-                  target.value.trim(),
-                  !!target.value.trim()
-                );
-                if (target.value.trim() && e.code === "Enter") {
-                  console.log(
-                    "realyy?",
-                    target.value.trim() && e.code === "Enter"
-                  );
-                  dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
-                }
-              }}
-              onChange={debounce((e) => {
-                const { target } = e as Event & { target: HTMLInputElement };
-                const text = target.value.trim();
-
-                if (text) {
-                  dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
-                  dispatch({ type: "RESET_SEARCH", searchValue: text });
-                }
-              }, 800)}
-            />
-            <Button
-              size="sm"
-              variant="subtle"
-              disabled={!searchValue.trim()}
-              onClick={() => {
+        <div className="relative w-full">
+          <Input
+            tabIndex={1}
+            className="mb-2.5"
+            onKeyDown={(e) => {
+              const { target } = e as unknown as Event & {
+                target: HTMLInputElement;
+              };
+              if (target.value.trim() && e.code === "Enter") {
                 dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
-              }}
-              className="absolute right-1 top-1 h-8 w-8"
-            >
-              <ArrowRight />
-            </Button>
-          </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className={cn(
-                "flex h-10 items-center p-3",
-                "rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-800 "
-              )}
-            >
-              <MoreVertical className="h-5 w-5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="mr-3">
-              <DropdownMenuItem
-                className="disable-focus-visible flex cursor-pointer items-center space-x-3"
-                onClick={() => showToast("Coming Soon!", "warning")}
-              >
-                <Users className="h-5 w-5 shrink-0" />
-                <span>Share</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="disable-focus-visible flex cursor-pointer items-center space-x-3"
-                onClick={() => showToast("Coming Soon!", "warning")}
-              >
-                <Bookmark className="h-5 w-5 shrink-0" />
-                <span>Bookmark</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="disable-focus-visible cursor-pointer"
-                onClick={() => showToast("Coming Soon!", "warning")}
-              >
-                <Link
-                  href={`${
-                    process.env.NEXT_PUBLIC_VERCEL_URL as string
-                  }/discover/similar?trackid=${selectedTrackId}`}
-                  className="flex items-center space-x-3"
-                >
-                  <Icons.spotify className="h-5 w-5 shrink-0" />
-                  <span>Library</span>
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                search(target.value.trim());
+              }
+            }}
+            onChange={() => setSearchEnabled(!!searchRef.current?.value.trim())}
+            ref={searchRef}
+          />
+          <Button
+            size="sm"
+            variant="subtle"
+            disabled={!searchEnabled}
+            onClick={() => {
+              dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
+              search(searchRef.current!.value.trim());
+            }}
+            className="absolute right-1 top-1 h-8 w-8"
+          >
+            <ArrowRight />
+          </Button>
         </div>
         <SelectTrigger className="h-0 border-0 p-0 opacity-0">
           <SelectValue />

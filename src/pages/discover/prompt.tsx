@@ -2,10 +2,25 @@ import { Input } from "@/components/ui/core/input";
 import Shell from "@/components/ui/core/shell";
 import { api } from "@/utils/api";
 import { debounce } from "lodash";
-import { useContext, useEffect, useState, type UIEvent } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type UIEvent,
+} from "react";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 
 import EmptyScreen from "@/components/ui/core/empty-screen";
-import { CircleSlashed, Music2 } from "lucide-react";
+import {
+  ArrowRight,
+  CircleSlashed,
+  Music2,
+  Bookmark,
+  MoreVertical,
+  Users,
+} from "lucide-react";
 import { SkeletonContainer, SkeletonText } from "@/components/ui/skeleton";
 import { MusicPlayerContext } from "../_app";
 import { cn } from "@/utils/cn";
@@ -16,6 +31,15 @@ import useLoadMore from "@/utils/hooks/useLoadMore";
 import TabsList from "@/components/ui/tabsList";
 import { useRouter } from "next/router";
 import { TrackItem } from "@/components/track-item";
+import { Button } from "@/components/ui/core/button";
+import Link from "next/link";
+import { Icons } from "@/components/ui/core/icons";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown";
 
 export const ItemSkeleton = ({ time = true }: { time: boolean }) => {
   return (
@@ -57,7 +81,11 @@ export const ListSkeleton = ({
 
 const Prompt = () => {
   const [searchValue, setSearchValue] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [searchEnabled, setSearchEnabled] = useState(false);
   const [showHeading, setShowHeading] = useState(true);
+
+  const [inputParentRef] = useAutoAnimate();
   const utils = api.useContext();
   const router = useRouter();
 
@@ -65,6 +93,22 @@ const Prompt = () => {
 
   const { prompt } = state;
   const songsList = state[state.crrRoute].songsList;
+
+  const search = useCallback(
+    (searchQuery: string) => {
+      if (searchValue !== searchQuery) {
+        dispatch({ type: "RESET_SEARCH" });
+        setSearchValue(searchQuery);
+        router.push({
+          pathname: router.pathname,
+          query: {
+            search: searchQuery,
+          },
+        });
+      }
+    },
+    [searchValue]
+  );
 
   const {
     data: recomSongs,
@@ -174,11 +218,12 @@ const Prompt = () => {
 
   useEffect(() => {
     const query = router.asPath.split("?")[1];
-    if (query?.includes("prompt")) {
-      const prompt = new URLSearchParams(query).get("prompt");
-      setSearchValue(prompt!);
+    if (query?.includes("search")) {
+      const search = new URLSearchParams(query).get("search");
+      setSearchValue(search!);
+      setSearchEnabled(true);
     }
-  }, [router.query.prompt]);
+  }, []);
 
   const [loadMore] = useLoadMore<HTMLUListElement>({
     loadingMore: prompt.loadingMore,
@@ -207,25 +252,76 @@ const Prompt = () => {
         ]}
       />
 
-      <Input
-        defaultValue={searchValue}
-        placeholder="I want to listen to something relaxing before bed"
-        onChange={debounce((e) => {
-          const { target } = e as Event & { target: HTMLInputElement };
-          const text = target.value;
-          if (text.trim()) {
-            setSearchValue(text.trim());
-            dispatch({ type: "RESET_SEARCH" });
-            router.push({
-              pathname: router.pathname,
-              query: {
-                prompt: text.trim(),
-              },
-            });
-          }
-        }, 800)}
-        className="mb-2.5"
-      />
+      <div className="flex space-x-2" ref={inputParentRef}>
+        <div className="relative w-full">
+          <Input
+            defaultValue={searchValue}
+            placeholder="I want to listen to something relaxing before bed"
+            onKeyDown={(e) => {
+              const { target } = e as unknown as Event & {
+                target: HTMLInputElement;
+              };
+              if (target.value.trim() && e.code === "Enter") {
+                search(target.value.trim());
+              }
+            }}
+            onChange={() => setSearchEnabled(!!searchRef.current?.value.trim())}
+            className="mb-2.5"
+            ref={searchRef}
+          />
+          <Button
+            size="sm"
+            variant="subtle"
+            disabled={!searchEnabled}
+            onClick={() => {
+              search(searchRef.current!.value.trim());
+            }}
+            className={cn("absolute right-1 top-1 h-8 w-8 transition-all")}
+          >
+            <ArrowRight />
+          </Button>
+        </div>
+        {recomSongs && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={cn(
+                "flex h-10 items-center p-3",
+                "rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-800 "
+              )}
+            >
+              <MoreVertical className="h-5 w-5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="mr-3">
+              <DropdownMenuItem
+                className="disable-focus-visible flex cursor-pointer items-center space-x-3"
+                onClick={() => showToast("Coming Soon!", "warning")}
+              >
+                <Users className="h-5 w-5 shrink-0" />
+                <span>Share</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="disable-focus-visible flex cursor-pointer items-center space-x-3"
+                onClick={() => showToast("Coming Soon!", "warning")}
+              >
+                <Bookmark className="h-5 w-5 shrink-0" />
+                <span>Bookmark</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="disable-focus-visible cursor-pointer"
+                onClick={() => showToast("Coming Soon!", "warning")}
+              >
+                <Link
+                  href={router.asPath}
+                  className="flex items-center space-x-3"
+                >
+                  <Icons.spotify className="h-5 w-5 shrink-0" />
+                  <span>Library</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
       {isFetching && !prompt.loadingMore && (
         <ListSkeleton Item={ItemSkeleton} />
       )}
