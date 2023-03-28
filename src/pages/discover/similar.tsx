@@ -467,7 +467,7 @@ const Similar = () => {
       <TabsList
         list={[
           { href: "/discover/prompt", name: "Prompt" },
-          { href: "/discover/similar", name: "Similar" },
+          { href: router.asPath, name: "Similar" },
         ]}
       />
       <Select

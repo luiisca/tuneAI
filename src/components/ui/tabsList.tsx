@@ -23,7 +23,7 @@ export const TabsList = ({
             crrId === 0 ? "right" : "left"
           }
           selected={
-            crrId === list.findIndex((item) => router.pathname === item.href)
+            crrId === list.findIndex((item) => router.asPath === item.href)
           }
         />
       ))}
