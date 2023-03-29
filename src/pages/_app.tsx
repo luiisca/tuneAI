@@ -3,7 +3,7 @@ import { useSession } from "next-auth/react";
 import { type Session } from "next-auth";
 import { Inter as FontSans } from "@next/font/google";
 import { SessionProvider } from "next-auth/react";
-import * as SliderPrimitive from "@radix-ui/react-slider";
+import type * as SliderPrimitive from "@radix-ui/react-slider";
 import Image from "next/image";
 
 import { api } from "../utils/api";
@@ -42,17 +42,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown";
 import React from "react";
-import { Button } from "@/components/ui/core/button";
 import {
   DEFAULT_RESULTS_QTT,
   DEFAULT_SOUND,
   MIN_VOL_TO_MUTE,
+  WEBAPP_URL,
 } from "@/utils/constants";
 import { Progress } from "@/components/ui/progress";
 import { convertToSeconds, formatSongDuration } from "@/utils/song-time";
 // import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import type { Button } from "@/components/ui/core/button";
 const fontSans = FontSans({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -263,7 +264,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
 
     case "SET_SCANNING": {
       if (state[state.crrRoute].songsList) {
-        const newSongsList = state[state.crrRoute].songsList!;
+        const newSongsList = state[state.crrRoute].songsList as PlayerSong[];
         const newSongItem = newSongsList[action.index];
 
         if (newSongItem) {
@@ -292,7 +293,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
     }
     case "TOGGLE_FAVOURITE": {
       if (state[state.crrRoute].songsList) {
-        const newSongsList = state[state.crrRoute].songsList!;
+        const newSongsList = state[state.crrRoute].songsList as PlayerSong[];
         const newSongItem = newSongsList[action.songPos];
 
         if (newSongItem) {
@@ -585,7 +586,7 @@ const MusicPlayer = () => {
     const crrRoute = router.pathname.includes("similar") ? "similar" : "prompt";
     dispatch({ type: "SAVE_CRR_ROUTE", route: crrRoute });
     dispatch({ type: "RESET_SEARCH", route: crrRoute });
-  }, [router.pathname]);
+  }, [router.pathname, dispatch]);
 
   const [soundHovered, setSoundHovered] = useState(false);
 
@@ -598,7 +599,7 @@ const MusicPlayer = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
     dispatch({ type: "SAVE_AUDIO_REF", audioRef });
-  }, [audioRef]);
+  }, [audioRef, dispatch]);
 
   const sliderRef = useRef<React.ElementRef<
     typeof SliderPrimitive.Root
@@ -723,7 +724,7 @@ const MusicPlayer = () => {
           {/* mobile overlay player */}
           <aside
             className={cn(
-              "fixed inset-0 flex h-screen w-screen transform flex-col transition duration-200 ease-in-out md:hidden",
+              "fixed inset-0 flex h-screen w-screen flex-col transition duration-200 ease-in-out md:hidden",
               "bg-gradient-to-b from-gray-50 to-gray-100 p-3",
               "dark:from-slate-800 dark:to-slate-900",
               mobilePlayerOpen ? "translate-y-0" : "translate-y-full"
@@ -1242,7 +1243,6 @@ export const LoadingIcon = ({
 export const ScanSimilarsBttn = ({
   trackPos,
   trackId,
-  musicPlayer,
   className,
   iconClassName,
   text,
@@ -1250,7 +1250,6 @@ export const ScanSimilarsBttn = ({
 }: React.ComponentProps<typeof Button> & {
   trackPos?: number;
   trackId?: string;
-  musicPlayer?: boolean;
   className?: string;
   iconClassName?: string;
   text?: React.ReactNode;
@@ -1270,7 +1269,12 @@ export const ScanSimilarsBttn = ({
 
   return (
     <Link
-      href={`${process.env.NEXT_PUBLIC_VERCEL_URL}/discover/similar?trackid=${trackId}`}
+      href={
+        (WEBAPP_URL &&
+          trackId &&
+          `${WEBAPP_URL}/discover/similar?trackid=${trackId}`) ||
+        ""
+      }
       onClick={() => {
         if (!scanning) {
           showToast("Discovering similar songs!", "success");

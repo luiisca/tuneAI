@@ -5,7 +5,6 @@ import { cn } from "@/utils/cn";
 import { Icons } from "./core/icons";
 import { useTheme } from "next-themes";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
-import { SkeletonContainer } from "./skeleton";
 
 interface Props {
   footerText?: React.ReactNode | string;

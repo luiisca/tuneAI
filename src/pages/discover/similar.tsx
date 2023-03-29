@@ -22,10 +22,10 @@ import {
 } from "@/components/ui/core/select";
 import { Input } from "@/components/ui/core/input";
 import { ListSkeleton } from "./prompt";
-import { MusicPlayerContext, PlayerSong } from "../_app";
+import { MusicPlayerContext, type PlayerSong } from "../_app";
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import { ArrowRight, CircleSlashed, Music2 } from "lucide-react";
-import { SongType } from "@/server/api/routers/discover";
+import type { SongType } from "@/server/api/routers/discover";
 import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { formatSongDuration } from "@/utils/song-time";
 import { cn } from "@/utils/cn";
@@ -125,7 +125,7 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
 
 const SpotifyItemSkeleton = () => {
   return (
-    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 pl-8 pr-2 dark:bg-slate-900 md:pr-4">
+    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 pl-8 dark:bg-slate-900 md:pr-4">
       <div className="flex h-full w-full items-center space-x-4 ">
         {/* image */}
         <SkeletonText className="h-10 w-10 shrink-0" />
@@ -165,7 +165,7 @@ const Similar = () => {
         dispatch({ type: "RESET_SEARCH", searchValue: searchQuery });
       }
     },
-    [searchValue]
+    [searchValue, dispatchPlayer]
   );
 
   const {} = api.spotify.singleTrack.useQuery(
@@ -312,17 +312,15 @@ const Similar = () => {
     if (isError) {
       showToast(error.message, "error");
     }
-  }, [error]);
+  }, [error, isError]);
 
   useEffect(() => {
     const query = router.asPath.split("?")[1];
     if (query?.includes("trackid")) {
       const trackId = new URLSearchParams(query).get("trackid");
-      trackId !== "null" &&
-        trackId !== "undefined" &&
-        dispatch({ type: "SELECT_TRACK_ID", value: trackId! });
+      trackId && dispatch({ type: "SELECT_TRACK_ID", value: trackId });
     }
-  }, [router.query.trackid]);
+  }, [router.query.trackid, router.asPath]);
 
   useEffect(() => {
     if (isFetched && !isFetching && similar.loadingMore) {
@@ -344,7 +342,16 @@ const Similar = () => {
         });
       }
     }
-  }, [isFetched, isFetching, similar.loadingMore]);
+  }, [
+    isFetched,
+    isFetching,
+    similar.loadingMore,
+    dispatchPlayer,
+    selectedTrack?.id,
+    similar.forwardLoadingMore,
+    similar.resQtt,
+    utils.discover.similar,
+  ]);
 
   const [loadMore] = useLoadMore({
     loadingMore: similar.loadingMore,
@@ -361,18 +368,16 @@ const Similar = () => {
   return (
     <Shell
       heading="Discover"
-      headingClassname={cn(
-        showHeading ? "h-auto opacity-100" : "h-0 m-0 -z-10"
-      )}
+      headingClassname={cn(showHeading ? "h-auto" : "h-0 m-0 -z-10")}
       subtitle="Discover new music from your favorite tracks"
     >
       <div
         className={cn(
-          "border border-gray-100 bg-gray-50 opacity-0 dark:border-slate-900 dark:bg-slate-800",
-          "absolute right-0 top-16 flex min-h-min w-2/5 items-center justify-center overflow-hidden rounded-l-xl opacity-100 sm:w-2/5 md:top-2 lg:top-8",
+          "border border-gray-100 bg-gray-50 dark:border-slate-900 dark:bg-slate-800",
+          "absolute right-0 top-16 flex min-h-min w-2/5 items-center justify-center overflow-hidden rounded-l-xl sm:w-2/5 md:top-2 lg:top-8",
           isFetching &&
             similar.resPage === 1 &&
-            "opacity-100 animate-in slide-in-from-right",
+            "animate-in slide-in-from-right",
           showHeading ? "sm:top-20" : "sm:top-[5.5rem] md:top-1 lg:top-2"
         )}
       >
@@ -482,12 +487,14 @@ const Similar = () => {
           if (!(value === "loading")) {
             const track = JSON.parse(value) as SpotifyTrackResultType;
             console.log("ONVALUECHANGE SElECT", track);
-            router.push({
-              pathname: router.pathname,
-              query: {
-                trackid: track.id,
-              },
-            });
+            router
+              .push({
+                pathname: router.pathname,
+                query: {
+                  trackid: track.id,
+                },
+              })
+              .catch(console.error);
             if (!track.previewUrl) {
               showToast("Cannot play. Sorry", "error");
 
@@ -529,7 +536,8 @@ const Similar = () => {
             disabled={!searchEnabled}
             onClick={() => {
               dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open: true });
-              search(searchRef.current!.value.trim());
+              searchRef.current?.value &&
+                search(searchRef.current.value.trim());
             }}
             className="absolute right-1 top-1 h-8 w-8"
           >
@@ -669,7 +677,7 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
     if (isError) {
       showToast(error.message, "error");
     }
-  }, [error]);
+  }, [error, isError]);
 
   useEffect(() => {
     if (isFetched && !isFetching && loadingMore) {
@@ -681,7 +689,7 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
     console.log("update fn run", resPage);
     setResPage(resPage + 1);
     setLoadingMore(true);
-  }, [resPage, loadingMore]);
+  }, [resPage]);
 
   const [loadMore] = useLoadMore<HTMLDivElement>({
     loadingMore,

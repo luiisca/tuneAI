@@ -40,7 +40,7 @@ export const Tab = ({
     if (router.asPath.includes(stateHref)) {
       setStateHref(router.asPath);
     }
-  }, [router.asPath]);
+  }, [router.asPath, stateHref]);
 
   return (
     <Link href={stateHref}>

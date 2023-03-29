@@ -1,11 +1,6 @@
-import { NextRouter, useRouter } from "next/router";
-import {
-  Dispatch,
-  ReactNode,
-  SetStateAction,
-  useEffect,
-  useState,
-} from "react";
+import { type NextRouter, useRouter } from "next/router";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { noop } from "lodash";
 import { useTheme } from "next-themes";
@@ -15,7 +10,7 @@ import {
   Bookmark,
   Compass,
   LogOut,
-  LucideIcon,
+  type LucideIcon,
   MoreVertical,
   Users,
 } from "lucide-react";
@@ -273,7 +268,7 @@ const MobileNavigation = () => {
     <>
       <nav
         className={cn(
-          "fixed bottom-0 z-30 -mx-4 flex w-full border-t border-t-gray-200 bg-gray-50 bg-opacity-40 px-1 shadow backdrop-blur-md md:hidden",
+          "fixed bottom-0 z-30 -mx-4 flex w-full border-t border-t-gray-200 bg-gray-50/40 px-1 shadow backdrop-blur-md md:hidden",
           "dark:border-t-slate-700 dark:bg-slate-900"
         )}
       >

@@ -98,16 +98,17 @@ const Prompt = () => {
     (searchQuery: string) => {
       if (searchValue !== searchQuery) {
         dispatch({ type: "RESET_SEARCH" });
-        setSearchValue(searchQuery);
-        router.push({
-          pathname: router.pathname,
-          query: {
-            search: searchQuery,
-          },
-        });
+        router
+          .push({
+            pathname: router.pathname,
+            query: {
+              search: searchQuery,
+            },
+          })
+          .catch(console.error);
       }
     },
-    [searchValue]
+    [searchValue, dispatch, router]
   );
 
   const {
@@ -160,7 +161,10 @@ const Prompt = () => {
               if (prevData && data) {
                 dispatch({
                   type: "SAVE_SONGS",
-                  songs: [...songsList!, ...formatTracksForSongsList(data)],
+                  songs: [
+                    ...(songsList || []),
+                    ...formatTracksForSongsList(data),
+                  ],
                 });
 
                 return [...prevData, ...data];
@@ -214,16 +218,28 @@ const Prompt = () => {
         });
       }
     }
-  }, [isFetched, isFetching, prompt.loadingMore]);
+  }, [
+    isFetched,
+    isFetching,
+    prompt.loadingMore,
+    dispatch,
+    prompt.forwardLoadingMore,
+    prompt.resQtt,
+    searchValue,
+    utils.discover.prompt,
+  ]);
 
   useEffect(() => {
     const query = router.asPath.split("?")[1];
     if (query?.includes("search")) {
       const search = new URLSearchParams(query).get("search");
-      setSearchValue(search!);
-      setSearchEnabled(true);
+      if (search) {
+        setSearchValue(search);
+        console.log("🚀update search!");
+        setSearchEnabled(true);
+      }
     }
-  }, []);
+  }, [router.asPath]);
 
   const [loadMore] = useLoadMore<HTMLUListElement>({
     loadingMore: prompt.loadingMore,
@@ -240,9 +256,7 @@ const Prompt = () => {
   return (
     <Shell
       heading="Discover"
-      headingClassname={cn(
-        showHeading ? "h-auto opacity-100" : "h-0 m-0 -z-10"
-      )}
+      headingClassname={cn(showHeading ? "h-auto" : "h-0 m-0 -z-10")}
       subtitle="Discover music that matches your mood with AI"
     >
       <TabsList
@@ -274,7 +288,8 @@ const Prompt = () => {
             variant="subtle"
             disabled={!searchEnabled}
             onClick={() => {
-              search(searchRef.current!.value.trim());
+              searchRef.current?.value &&
+                search(searchRef.current.value.trim());
             }}
             className={cn("absolute right-1 top-1 h-8 w-8 transition-all")}
           >

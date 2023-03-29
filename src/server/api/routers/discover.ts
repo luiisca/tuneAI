@@ -379,7 +379,7 @@ const getSpotifyTracksData = async (tracksId: string, refreshToken: string) => {
     `${env.SPOTIFY_API_ENDPOINT}/tracks?ids=${tracksId}`,
     {
       headers: {
-        Authorization: `Bearer ${accessToken!}`,
+        Authorization: `Bearer ${accessToken || ""}`,
         "Content-Type": "application/json",
       },
     }
@@ -429,15 +429,15 @@ export const discoverRouter = createTRPCRouter({
         songs = spotifyTracks.map((track: SpotifyApi.TrackObjectFull) => {
           const recomSong = lastRecomSongs.find(
             (song) => song?.cursor === track.id
-          );
+          ) as SongResult;
 
           return {
-            id: recomSong!.cursor,
+            id: recomSong.cursor,
             spotifyUrl: track.external_urls.spotify,
-            genres: recomSong!.node.audioAnalysisV6.result.genreTags,
-            moods: recomSong!.node.audioAnalysisV6.result.moodTags,
-            instruments: recomSong!.node.audioAnalysisV6.result.instrumentTags,
-            musicalEra: recomSong!.node.audioAnalysisV6.result.musicalEraTag,
+            genres: recomSong.node.audioAnalysisV6.result.genreTags,
+            moods: recomSong.node.audioAnalysisV6.result.moodTags,
+            instruments: recomSong.node.audioAnalysisV6.result.instrumentTags,
+            musicalEra: recomSong.node.audioAnalysisV6.result.musicalEraTag,
             duration: track.duration_ms / 1000,
             coverUrl:
               track.album?.images[0]?.url ||
@@ -520,15 +520,15 @@ export const discoverRouter = createTRPCRouter({
           songs = spotifyTracks.map((track: SpotifyApi.TrackObjectFull) => {
             const simSong = lastSimSongs.find(
               (song) => song?.cursor === track.id
-            );
+            ) as SongResult;
 
             return {
-              id: simSong!.cursor,
+              id: simSong.cursor,
               spotifyUrl: track?.external_urls.spotify,
-              genres: simSong!.node.audioAnalysisV6.result.genreTags,
-              moods: simSong!.node.audioAnalysisV6.result.moodTags,
-              instruments: simSong!.node.audioAnalysisV6.result.instrumentTags,
-              musicalEra: simSong!.node.audioAnalysisV6.result.musicalEraTag,
+              genres: simSong.node.audioAnalysisV6.result.genreTags,
+              moods: simSong.node.audioAnalysisV6.result.moodTags,
+              instruments: simSong.node.audioAnalysisV6.result.instrumentTags,
+              musicalEra: simSong.node.audioAnalysisV6.result.musicalEraTag,
               duration: track.duration_ms / 1000,
               coverUrl:
                 track?.album?.images[0]?.url ||
