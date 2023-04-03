@@ -21,7 +21,6 @@ import {
   SelectViewport,
 } from "@/components/ui/core/select";
 import { Input } from "@/components/ui/core/input";
-import { ListSkeleton } from "./prompt";
 import { MusicPlayerContext, type PlayerSong } from "../_app";
 import EmptyScreen from "@/components/ui/core/empty-screen";
 import { ArrowRight, CircleSlashed, Music2 } from "lucide-react";
@@ -32,7 +31,6 @@ import { cn } from "@/utils/cn";
 import { SkeletonContainer, SkeletonText } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/core/button";
 import { useRouter } from "next/router";
-import TabsList from "@/components/ui/tabsList";
 import showToast from "@/components/ui/core/notifications";
 import { TrackItem } from "@/components/track-item";
 import { loadMore } from "@/utils/load-more";
@@ -122,13 +120,14 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
     }
   }
 };
-
-const SpotifyItemSkeleton = () => {
+const ItemSkeleton = ({ time = true }: { time: boolean }) => {
   return (
-    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 pl-8 dark:bg-slate-900 md:pr-4">
-      <div className="flex h-full w-full items-center space-x-4 ">
+    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 py-2 dark:bg-slate-900 md:px-4">
+      <div className="flex h-full w-full items-center space-x-4">
+        {/* number */}
+        <SkeletonText className="my-auto hidden h-1/3 w-4 md:block" />
         {/* image */}
-        <SkeletonText className="h-10 w-10 shrink-0" />
+        <SkeletonText className="!ml-0 h-10 w-10 shrink-0 md:!ml-4" />
         <div className="flex w-full flex-col justify-center space-y-1">
           {/* title */}
           <SkeletonText className="h-5 w-1/3" />
@@ -137,8 +136,26 @@ const SpotifyItemSkeleton = () => {
         </div>
       </div>
       {/* time */}
-      <SkeletonText className="my-auto h-1/3 w-[4ch]" />
+      {time && <SkeletonText className="my-auto h-1/3 w-[4ch]" />}
     </div>
+  );
+};
+
+const ListSkeleton = ({
+  Item = ItemSkeleton,
+}: {
+  Item?: React.ElementType;
+}) => {
+  return (
+    <SkeletonContainer>
+      <div className="space-y-2">
+        {Array(DEFAULT_RESULTS_QTT - 10) // -10 to avoid letting the user send more than 1 load more req when bottom reached
+          .fill(null)
+          .map((_, id) => (
+            <Item key={id} />
+          ))}
+      </div>
+    </SkeletonContainer>
   );
 };
 
@@ -354,7 +371,7 @@ const Similar = () => {
   return (
     <Shell
       heading="Discover"
-      headingClassname={cn(showHeading ? "h-auto" : "h-0 m-0 -z-10")}
+      headingClassname={cn(showHeading ? "h-auto" : "h-0 m-0 -z-10 p-0")}
       subtitle="Discover new music from your favorite tracks"
     >
       <div
@@ -371,17 +388,17 @@ const Similar = () => {
           <SkeletonContainer className="w-full">
             <div
               className={cn(
-                "flex animate-pulse items-center justify-between space-x-2 py-2 pl-4 transition-all dark:bg-slate-900"
+                "flex animate-pulse items-center justify-between space-x-2 transition-all dark:bg-slate-900"
               )}
             >
               <div className="flex h-full w-full flex-row-reverse items-center justify-between space-x-4">
                 {/* image */}
-                <SkeletonText className="hidden shrink-0 rounded-none sm:block sm:h-16 sm:w-16 md:h-20 md:w-20" />
-                <div className="flex w-full flex-col justify-center space-y-1">
+                <SkeletonText className="hidden h-11 w-11 shrink-0 rounded-none sm:block sm:h-16 sm:w-16 md:h-20 md:w-20" />
+                <div className="my-1 flex w-full flex-col justify-center space-y-1">
                   {/* title */}
-                  <SkeletonText className="h-5 w-3/5 sm:w-1/3" />
+                  <SkeletonText className="h-4 w-3/5 sm:h-5 sm:w-1/3" />
                   {/* artist */}
-                  <SkeletonText className="h-4 w-4/5 text-sm sm:w-1/4" />
+                  <SkeletonText className="h-3 w-4/5 text-sm sm:h-4 sm:w-1/4" />
                 </div>
               </div>
             </div>
@@ -440,7 +457,7 @@ const Similar = () => {
               <div
                 className={cn(
                   "flex w-full flex-col justify-center overflow-hidden transition-all sm:h-auto sm:w-4/5",
-                  showHeading ? "h-16" : "h-12"
+                  showHeading ? "h-11 sm:h-16" : "h-12"
                 )}
               >
                 <p className="truncate">{selectedTrack.title}</p>
@@ -452,15 +469,6 @@ const Similar = () => {
           </div>
         )}
       </div>
-      <TabsList
-        list={[
-          { href: "/discover/prompt", name: "Prompt" },
-          {
-            href: "/discover/similar",
-            name: "Similar",
-          },
-        ]}
-      />
       <Select
         onOpenChange={(open) =>
           dispatch({ type: "OPEN_SPOTIFY_RESULTS_LIST", open })
@@ -496,7 +504,12 @@ const Similar = () => {
           }
         }}
       >
-        <div className="relative w-full">
+        <div
+          className={cn(
+            "relative w-full",
+            !showHeading && "top-3 w-3/5 sm:top-2 md:top-1 lg:-mt-4"
+          )}
+        >
           <Input
             tabIndex={1}
             className="mb-2.5"
@@ -546,7 +559,7 @@ const Similar = () => {
         />
       )}
       {tracks && !("message" in tracks) && tracks.length !== 0 && (
-        <div className="h-[calc(100%-10.5rem)] sm:h-[calc(100%-12.5rem)] md:h-[calc(100%-7.5rem)] lg:h-[calc(100%-4.5rem)]">
+        <div className="h-[calc(100%-6.3rem)] sm:h-[calc(100%-8.3rem)] md:h-[calc(100%-4.3rem)] lg:h-[calc(100%-0.3rem)]">
           {/* @TODO: take a look at this condition, might be unncessary */}
           {(!isFetching || (isFetching && similar.loadingMore)) && (
             <ul
@@ -742,6 +755,25 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
         )}
       </div>
     </SelectViewport>
+  );
+};
+
+const SpotifyItemSkeleton = () => {
+  return (
+    <div className="flex h-14 animate-pulse items-center justify-between space-x-2 p-2 pl-8 dark:bg-slate-900 md:pr-4">
+      <div className="flex h-full w-full items-center space-x-4 ">
+        {/* image */}
+        <SkeletonText className="h-10 w-10 shrink-0" />
+        <div className="flex w-full flex-col justify-center space-y-1">
+          {/* title */}
+          <SkeletonText className="h-5 w-1/3" />
+          {/* artist */}
+          <SkeletonText className="h-4 w-1/4 text-sm" />
+        </div>
+      </div>
+      {/* time */}
+      <SkeletonText className="my-auto h-1/3 w-[4ch]" />
+    </div>
   );
 };
 

@@ -6,14 +6,7 @@ import { noop } from "lodash";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/core/button";
 import { Icons } from "./icons";
-import {
-  Bookmark,
-  Compass,
-  LogOut,
-  type LucideIcon,
-  MoreVertical,
-  Users,
-} from "lucide-react";
+import { Compass, LogOut, type LucideIcon, MoreVertical } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { signOut, useSession } from "next-auth/react";
 import {
@@ -195,16 +188,6 @@ const navigation: NavigationItemType[] = [
     name: "Discover",
     href: "/discover/prompt",
     icon: Compass,
-  },
-  {
-    name: "Community",
-    href: "/community",
-    icon: Users,
-  },
-  {
-    name: "Favorites",
-    href: "/favorites",
-    icon: Bookmark,
   },
   {
     name: "Spotify",

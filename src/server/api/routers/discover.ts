@@ -5,37 +5,6 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { getAccessToken } from "../utils";
 
-const searchSongsQueryDocument = `
-query FreeTextSearch($text: String!, $first: Int!) {
-  freeTextSearch(
-    first: $first
-    target: { spotify: {} }
-    searchText: $text
-  ) {
-    ... on FreeTextSearchError {
-      message
-      code
-    }
-    ... on FreeTextSearchConnection {
-      edges {
-        cursor
-        node {
-          audioAnalysisV6 {
-            ... on AudioAnalysisV6Finished {
-              result {
-                genreTags
-                moodTags
-                instrumentTags
-                musicalEraTag
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-`;
 const searchSimilarTracksQueryDocument = `
 query SimilarTracksQuery($trackId: ID!, $first: Int!) {
   spotifyTrack(id: $trackId) {
@@ -99,13 +68,6 @@ type SongResult = {
     };
   };
 };
-interface SearchSongsResult {
-  data: {
-    freeTextSearch: {
-      edges: SongResult[];
-    };
-  };
-}
 
 type SearchSimilarSongsResult =
   | {
@@ -172,63 +134,6 @@ const getIdsString = (songs: (SongResult | null)[]) => {
 };
 
 // cianity api calls
-let uniqueRecomIds: string[] = [];
-let uniqueRecomSongs: (SongResult | null)[] = [];
-
-const getAiRecomSongs = async (text: string, first: number) => {
-  const res = await fetch(env.API_URL, {
-    method: "POST",
-    body: JSON.stringify({
-      query: searchSongsQueryDocument,
-      variables: {
-        text,
-        first,
-      },
-    }),
-    headers: {
-      Authorization: `Bearer ${env.ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-  });
-  console.log("😲 getAiRecomSongs: res", res);
-  const songsResult = (await res.json()) as SearchSongsResult;
-  console.log("😲 getAiRecomSongs: songsResult", songsResult);
-
-  const NEW_SONGS_START_INDEX =
-    first === DEFAULT_RESULTS_QTT ? 0 : first - DEFAULT_RESULTS_QTT;
-  const latestTracks = songsResult.data.freeTextSearch.edges.slice(
-    NEW_SONGS_START_INDEX
-  );
-  console.log("FIRST", first);
-  console.log("EDGES", songsResult.data.freeTextSearch.edges);
-  console.log("UNIQUE TRACKS before", uniqueRecomIds);
-  console.log("LATEST TRACKS", latestTracks);
-
-  if (first === DEFAULT_RESULTS_QTT) {
-    uniqueRecomIds = [];
-    uniqueRecomSongs = [];
-  }
-
-  latestTracks.forEach((track) => {
-    if (!uniqueRecomIds.includes(track.cursor)) {
-      uniqueRecomIds.push(track.cursor);
-      uniqueRecomSongs.push(track);
-
-      return;
-    }
-
-    uniqueRecomSongs.push(null);
-  });
-  console.log("UNIQUE TRACKS AFTER", uniqueRecomIds);
-  console.log("UNIQUE RECOM songs", uniqueRecomSongs);
-  console.log(
-    "SLICED UNIQUERECOm songs",
-    uniqueRecomSongs.slice(NEW_SONGS_START_INDEX)
-  );
-
-  return uniqueRecomSongs.slice(NEW_SONGS_START_INDEX);
-};
-
 let uniqueSimIds: string[] = [];
 let uniqueSimSongs: (SongResult | null)[] = [];
 
@@ -402,59 +307,6 @@ const getSpotifyTracksData = async (tracksId: string, refreshToken: string) => {
 };
 
 export const discoverRouter = createTRPCRouter({
-  prompt: publicProcedure
-    .input(
-      z.object({
-        text: z.string(),
-        first: z.number(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const { session } = ctx;
-      const { text, first } = input;
-      let songs: SongType[] = [];
-      console.log("🎠running prompt proc");
-
-      if (session) {
-        const lastRecomSongs = await getAiRecomSongs(text, first);
-        const ids = getIdsString(lastRecomSongs);
-
-        const spotifyTracks = await getSpotifyTracksData(
-          ids,
-          session.accessToken
-        );
-        // SPOTIFY ERROR
-        if ("message" in spotifyTracks) {
-          return spotifyTracks;
-        }
-
-        console.log("SPOTIFY tracks", spotifyTracks);
-        songs = spotifyTracks.map((track: SpotifyApi.TrackObjectFull) => {
-          const recomSong = lastRecomSongs.find(
-            (song) => song?.cursor === track.id
-          ) as SongResult;
-
-          return {
-            id: recomSong.cursor,
-            spotifyUrl: track.external_urls.spotify,
-            genres: recomSong.node.audioAnalysisV6.result.genreTags,
-            moods: recomSong.node.audioAnalysisV6.result.moodTags,
-            instruments: recomSong.node.audioAnalysisV6.result.instrumentTags,
-            musicalEra: recomSong.node.audioAnalysisV6.result.musicalEraTag,
-            duration: track.duration_ms / 1000,
-            coverUrl:
-              track.album?.images[0]?.url ||
-              track.album?.images[1]?.url ||
-              "/defaultSongCover.jpeg",
-            previewUrl: track.preview_url,
-            title: track.name,
-            artists: track.artists.map((artist) => artist.name),
-          };
-        });
-      }
-
-      return songs;
-    }),
   similar: publicProcedure
     .input(
       z.object({
