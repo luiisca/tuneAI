@@ -71,6 +71,11 @@ type ACTIONTYPE =
       value: string;
     }
   | {
+      type: "SET_SEARCH_VALUE";
+      searchValue: string;
+      listOpen: boolean;
+    }
+  | {
       type: "RESET_SEARCH";
       searchValue: string;
     }
@@ -94,6 +99,16 @@ const similarReducer = (state: InitialStateType, action: ACTIONTYPE) => {
       return {
         ...state,
         selectedTrackId: action.value,
+      };
+    }
+    case "SET_SEARCH_VALUE": {
+      return {
+        ...state,
+        searchValue: action.searchValue,
+        spotify: {
+          ...state.spotify,
+          listOpen: action.listOpen,
+        },
       };
     }
     case "RESET_SEARCH": {
@@ -331,11 +346,19 @@ const Similar = () => {
 
   useEffect(() => {
     const query = router.asPath.split("?")[1];
+    let trackId;
     if (query?.includes("trackid")) {
-      const trackId = new URLSearchParams(query).get("trackid");
+      trackId = new URLSearchParams(query).get("trackid");
       trackId && dispatch({ type: "SELECT_TRACK_ID", value: trackId });
     }
-  }, [router.query.trackid, router.asPath]);
+    if (query?.includes("search")) {
+      const searchValue = new URLSearchParams(query).get("search");
+      if (searchValue) {
+        dispatch({ type: "SET_SEARCH_VALUE", searchValue, listOpen: !trackId });
+        setSearchEnabled(true);
+      }
+    }
+  }, [router.query, router.asPath]);
 
   useEffect(() => {
     // FINISHES loading more similar tracks
@@ -482,6 +505,7 @@ const Similar = () => {
                 pathname: router.pathname,
                 query: {
                   trackid: track.id,
+                  search: searchValue,
                 },
               })
               .catch(console.error);
@@ -511,6 +535,7 @@ const Similar = () => {
           )}
         >
           <Input
+            defaultValue={searchValue}
             tabIndex={1}
             className="mb-2.5"
             onKeyDown={(e) => {
