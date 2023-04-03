@@ -83,7 +83,11 @@ export const TrackItem = ({
       <div className="flex items-center space-x-2">
         <div className="flex items-center">
           {track.previewUrl && (
-            <ScanSimilarsBttn trackPos={index} trackId={track.id} />
+            <ScanSimilarsBttn
+              trackPos={index}
+              trackId={track.id}
+              linkClassName="hidden xl:group-hover/track:block"
+            />
           )}
 
           <Link

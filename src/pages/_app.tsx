@@ -1299,6 +1299,7 @@ export const LoadingIcon = ({
 export const ScanSimilarsBttn = ({
   trackPos,
   trackId,
+  linkClassName,
   className,
   iconClassName,
   text,
@@ -1306,6 +1307,7 @@ export const ScanSimilarsBttn = ({
 }: React.ComponentProps<typeof Button> & {
   trackPos?: number;
   trackId?: string;
+  linkClassName?: string;
   className?: string;
   iconClassName?: string;
   text?: React.ReactNode;
@@ -1342,7 +1344,7 @@ export const ScanSimilarsBttn = ({
           dispatch({ type: "RESET_SIMILAR", onlyResQtt: true });
         }
       }}
-      className={!text ? "hidden xl:group-hover/track:block" : ""}
+      className={cn(linkClassName)}
     >
       <button
         {...props}
