@@ -34,10 +34,10 @@ export default function Login() {
       subtitle="Find your next favorite song with AI-powered search."
     >
       {errorMessage && oAuthError && (
-        <Alert className="mt-4" severity="error" title={errorMessage} />
+        <Alert className="mb-4" severity="error" title={errorMessage} />
       )}
       {errorMessage && !oAuthError && (
-        <Alert severity="error" title={errorMessage} />
+        <Alert className="mb-4" severity="error" title={errorMessage} />
       )}
       <div className="mx-auto flex w-auto items-center justify-center space-x-3">
         <Button

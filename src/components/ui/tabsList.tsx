@@ -1,4 +1,5 @@
 import { cn } from "@/utils/cn";
+import { WEBAPP_URL } from "@/utils/constants";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
@@ -37,7 +38,11 @@ export const Tab = ({
   const [stateHref, setStateHref] = useState(href);
   const router = useRouter();
   useEffect(() => {
-    if (router.asPath.includes(stateHref)) {
+    if (
+      router.asPath.includes(
+        new URL(`${WEBAPP_URL as string}/${stateHref}`).pathname
+      )
+    ) {
       setStateHref(router.asPath);
     }
   }, [router.asPath, stateHref]);

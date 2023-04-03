@@ -34,13 +34,12 @@ export const TrackItem = ({
     <div
       onClick={(e) => {
         const target = e.target as HTMLLIElement;
-        console.log("🤡Clicked!", target);
         if (!target.closest("button")) {
-          console.log("🆚Not bottom clicked, selecting");
           if (track.previewUrl) {
             dispatch({
               type: "SELECT_SONG",
-              songPos: index,
+              position: "crr",
+              id: index,
             });
           } else {
             showToast("Cannot play. Sorry", "error");

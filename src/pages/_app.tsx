@@ -50,10 +50,11 @@ import {
 } from "@/utils/constants";
 import { Progress } from "@/components/ui/progress";
 import { convertToSeconds, formatSongDuration } from "@/utils/song-time";
-// import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import type { Button } from "@/components/ui/core/button";
+import { getClosestPlayableSong } from "@/utils/get-closest-playable-song";
 const fontSans = FontSans({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -70,7 +71,7 @@ type ActionType =
       song: PlayerSong;
     }
   | {
-      type: "RESET_SIMILAR_SONGS";
+      type: "RESET_SIMILAR";
       onlyResQtt?: boolean;
     }
   | {
@@ -103,18 +104,17 @@ type ActionType =
       audioRef: React.MutableRefObject<HTMLAudioElement | null>;
     }
   | {
-      type: "SELECT_SCANNED_SONG";
+      type: "SELECT_SONG_FROM_SCANNED_SONG";
+      position: "crr" | "next";
     }
   | {
       type: "SELECT_SONG";
+      position?: "prev" | "crr" | "next";
+      id?: number;
       forwardLoadingMore?: boolean;
-      songPos: number;
-      position?: "prev" | "next";
-      loadingMore?: boolean;
-      trackReady?: boolean;
     }
   | {
-      type: "RESET_SEARCH";
+      type: "RESET_PROMPT";
       route?: (typeof playerPages)[number];
     }
   | {
@@ -200,7 +200,6 @@ const createCtx = <StateType, ActionType>(
 const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
   switch (action.type) {
     case "SAVE_SONGS": {
-      console.log("SAVING SONGS", state.crrRoute);
       return {
         ...state,
         [state.crrRoute]: {
@@ -218,11 +217,11 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         },
       };
     }
-    case "RESET_SIMILAR_SONGS": {
-      const { audioRef } = state;
-      if (audioRef && audioRef.current) {
-        audioRef.current.src = "";
-        audioRef.current.currentTime = 0;
+    case "RESET_SIMILAR": {
+      // empty audio src
+      if (state.audioRef && state.audioRef.current) {
+        state.audioRef.current.src = "";
+        state.audioRef.current.currentTime = 0;
       }
 
       if (action.onlyResQtt) {
@@ -234,20 +233,21 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
             resQtt: DEFAULT_RESULTS_QTT,
           },
         };
+      } else {
+        return {
+          ...state,
+          crrPlayingSong: null,
+          trackReady: null,
+          loop: false,
+          playing: false,
+          similar: {
+            ...state.similar,
+            songsList: null,
+            resPage: 1,
+            resQtt: DEFAULT_RESULTS_QTT,
+          },
+        };
       }
-      return {
-        ...state,
-        crrPlayingSong: null,
-        trackReady: null,
-        loop: false,
-        playing: false,
-        similar: {
-          ...state.similar,
-          songsList: null,
-          resPage: 1,
-          resQtt: DEFAULT_RESULTS_QTT,
-        },
-      };
     }
     case "SAVE_CRR_ROUTE": {
       return {
@@ -331,150 +331,170 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         audioRef: action.audioRef,
       };
     }
-    case "SELECT_SCANNED_SONG": {
-      return {
-        ...state,
-        crrPlayingSong: state.similar.scannedSong,
+    case "SELECT_SONG_FROM_SCANNED_SONG": {
+      const crrPlayingSong = state.crrPlayingSong as PlayerSong;
+
+      // set audio src
+      const playSong = (audioSrc: string) => {
+        if (state.audioRef && state.audioRef.current) {
+          // set audioRef src
+          state.audioRef.current.src = audioSrc;
+        }
       };
+
+      switch (action.position) {
+        case "crr": {
+          const scannedSong = state.similar.scannedSong as PlayerSong;
+          playSong(scannedSong.audioSrc as string);
+
+          return {
+            ...state,
+            crrPlayingSong: scannedSong,
+            similar: {
+              ...state.similar,
+            },
+          };
+        }
+        case "next": {
+          const songsList = state.similar.songsList;
+          const closestPlayableSongRes = getClosestPlayableSong({
+            position: "next",
+            closesestTrackPosId: crrPlayingSong.position + 1,
+            songsList,
+            loadingMore: state[state.crrRoute].loadingMore,
+          });
+
+          if (closestPlayableSongRes) {
+            if (closestPlayableSongRes === "LOAD_MORE") {
+              return {
+                ...state,
+                [state.crrRoute]: {
+                  ...state[state.crrRoute],
+                  forwardLoadingMore: true,
+                  resPage: state[state.crrRoute].resPage + 1,
+                  resQtt:
+                    (state[state.crrRoute].resPage + 1) * DEFAULT_RESULTS_QTT,
+                  loadingMore: true,
+                },
+              };
+            }
+
+            playSong(closestPlayableSongRes.audioSrc as string); // audioSrc always valid, otherwise getClosestPlayableSong fn searchs on next track
+
+            return {
+              ...state,
+              crrPlayingSong: closestPlayableSongRes,
+              similar: {
+                ...state.similar,
+              },
+            };
+          }
+        }
+
+        default: {
+          return state;
+        }
+      }
     }
     case "SELECT_SONG": {
-      // determine if forward or backward
-      const prev = action.position === "prev";
-      const next = action.position === "next";
-      const positionId = prev
-        ? action.songPos - 1
-        : next
-        ? action.songPos + 1
-        : action.songPos;
-
       const songsList = state[state.crrRoute].songsList;
-      const {
-        audioRef,
-        crrRoute,
-        similar: { scannedSong },
-      } = state;
+      const { audioRef } = state;
+      const crrPlayingSong = state.crrPlayingSong as PlayerSong;
 
-      const scannedIsPrev =
-        prev && scannedSong && positionId === -1 && crrRoute === "similar";
-      const nextFromScanned =
-        next && scannedSong && positionId === 0 && crrRoute === "similar";
-      const selectScanned =
-        !prev &&
-        !next &&
-        positionId === -1 &&
-        scannedSong &&
-        crrRoute === "similar";
-
-      // jump from selected track and songsList and viceversa when forwarding or backwarding
-      if (scannedIsPrev || selectScanned) {
+      const playSong = (audioSrc: string) => {
         if (audioRef && audioRef.current) {
-          audioRef.current.src = scannedSong.audioSrc || "";
+          // set audioRef src
+          audioRef.current.src = audioSrc;
         }
+      };
 
-        return {
-          ...state,
-          crrPlayingPos: action.songPos,
-          crrPlayingSong: scannedSong,
-          similar: {
-            ...state.similar,
-            forwardLoadingMore: false,
-          },
-        };
-      }
-      if (nextFromScanned) {
-        if (audioRef && audioRef.current && songsList && songsList[0]) {
-          audioRef.current.src = songsList[0].audioSrc || "";
-        }
+      switch (action.position) {
+        case "prev": {
+          const closestPlayableSongRes =
+            crrPlayingSong.position === 0 && state.crrRoute === "similar"
+              ? state.similar.scannedSong
+              : (getClosestPlayableSong({
+                  position: "prev",
+                  closesestTrackPosId: crrPlayingSong.position - 1,
+                  songsList,
+                  loadingMore: state[state.crrRoute].loadingMore,
+                }) as PlayerSong | null);
 
-        return {
-          ...state,
-          crrPlayingPos: action.songPos,
-          crrPlayingSong: songsList && songsList[0] ? songsList[0] : null,
-          similar: {
-            ...state.similar,
-            forwardLoadingMore: false,
-          },
-        };
-      }
+          if (closestPlayableSongRes) {
+            playSong(closestPlayableSongRes.audioSrc as string); // audioSrc always valid, otherwise getClosestPlayableSong fn searchs on next track
 
-      const nonInvalidSongPos = action.songPos === -1 || action.songPos > -1;
-
-      const getClosestPlayableSong = () => {
-        if (songsList && (next || prev) && !songsList[positionId]?.audioSrc) {
-          if (next && positionId >= songsList.length) {
-            console.log("latest el selected, returning load more");
-            return "LOAD_MORE";
+            return {
+              ...state,
+              crrPlayingSong: closestPlayableSongRes,
+              [state.crrRoute]: {
+                ...state[state.crrRoute],
+                forwardLoadingMore: action.forwardLoadingMore || false,
+              },
+            };
           }
-          for (
-            let i = positionId;
-            prev ? i >= 0 : i < songsList.length;
-            prev ? i-- : i++
+        }
+        case "crr": {
+          if (
+            songsList &&
+            typeof action.id === "number" &&
+            action.id >= 0 &&
+            songsList[action.id]
           ) {
-            console.log("inside for", songsList.length, "index", i);
-            if (songsList[i]?.audioSrc) {
-              console.log("audio available");
-              return songsList[i];
-            } else if (next && songsList.length - 1 === i) {
-              console.log("last item selected");
-              // is the last one and theres still is no audio, return load more signal
-              return "LOAD_MORE";
+            playSong((songsList[action.id] as PlayerSong).audioSrc as string);
+            return {
+              ...state,
+              crrPlayingSong: songsList[action.id] as PlayerSong,
+              [state.crrRoute]: {
+                ...state[state.crrRoute],
+              },
+            };
+          }
+
+          return state;
+        }
+        case "next": {
+          const closestPlayableSongRes = getClosestPlayableSong({
+            position: "next",
+            closesestTrackPosId: crrPlayingSong.position + 1,
+            songsList,
+            loadingMore: state[state.crrRoute].loadingMore,
+          });
+
+          if (closestPlayableSongRes) {
+            if (closestPlayableSongRes === "LOAD_MORE") {
+              return {
+                ...state,
+                [state.crrRoute]: {
+                  ...state[state.crrRoute],
+                  forwardLoadingMore: true,
+                  resPage: state[state.crrRoute].resPage + 1,
+                  resQtt:
+                    (state[state.crrRoute].resPage + 1) * DEFAULT_RESULTS_QTT,
+                  loadingMore: true,
+                },
+              };
             }
+
+            playSong(closestPlayableSongRes.audioSrc as string); // audioSrc always valid, otherwise getClosestPlayableSong fn searchs on next track
+
+            return {
+              ...state,
+              crrPlayingSong: closestPlayableSongRes,
+              [state.crrRoute]: {
+                ...state[state.crrRoute],
+                forwardLoadingMore: action.forwardLoadingMore || false,
+              },
+            };
           }
         }
 
-        if (songsList) {
-          console.log("current one selected, returning crr song");
-          return songsList[positionId];
+        default: {
+          return state;
         }
-      };
-      console.log("POSITION ID", positionId, "action", action.songPos);
-
-      const closestSongRes = getClosestPlayableSong();
-      console.log("closestSongRes", closestSongRes);
-
-      if (closestSongRes === "LOAD_MORE") {
-        console.log("updating state to load more");
-        console.log("forwarding", action.forwardLoadingMore);
-        return {
-          ...state,
-          [state.crrRoute]: {
-            ...state[state.crrRoute],
-            forwardLoadingMore: true,
-            resPage: state[state.crrRoute].resPage + 1,
-            resQtt: (state[state.crrRoute].resPage + 1) * DEFAULT_RESULTS_QTT,
-            loadingMore: true,
-          },
-          trackReady: action.trackReady || false,
-        };
       }
-
-      if (
-        audioRef &&
-        audioRef.current &&
-        nonInvalidSongPos &&
-        songsList &&
-        closestSongRes
-      ) {
-        console.log("setting audio src");
-        // set audioRef src
-        audioRef.current.src = closestSongRes.audioSrc || "";
-      }
-
-      return {
-        ...state,
-        crrPlayingPos: action.songPos,
-        crrPlayingSong:
-          (songsList &&
-            nonInvalidSongPos &&
-            (getClosestPlayableSong() as PlayerSong)) ||
-          null,
-        [state.crrRoute]: {
-          ...state[state.crrRoute],
-          forwardLoadingMore: action.forwardLoadingMore || false,
-        },
-      };
     }
-    case "RESET_SEARCH": {
+    case "RESET_PROMPT": {
+      // empty audio src
       if (state.audioRef.current) {
         state.audioRef.current.src = "";
         state.audioRef.current.currentTime = 0;
@@ -505,13 +525,13 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
       };
     }
     case "SHOW_MORE_SIMILAR": {
-      console.log(
-        "MUSICPLAYER REDUCER: inside SHOW_MORE_SIMILAR case fn",
-        "action object",
-        action
-      );
-      console.log("MUSICPLAYER REDUCER: crr route", state.crrRoute);
-      console.log("MUSICPLAYER REDUCER: state", state);
+      // console.log(
+      //   "MUSICPLAYER REDUCER: inside SHOW_MORE_SIMILAR case fn",
+      //   "action object",
+      //   action
+      // );
+      // console.log("MUSICPLAYER REDUCER: crr route", state.crrRoute);
+      // console.log("MUSICPLAYER REDUCER: state", state[state.crrRoute]);
       return {
         ...state,
         [state.crrRoute]: {
@@ -523,7 +543,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
       };
     }
     case "STOP_LOADING_MORE_SIMILAR": {
-      console.log("ABOUT TO stop loading more state");
+      // console.log("ABOUT TO stop loading more state");
       return {
         ...state,
         [state.crrRoute]: {
@@ -585,7 +605,7 @@ const MusicPlayer = () => {
   useEffect(() => {
     const crrRoute = router.pathname.includes("similar") ? "similar" : "prompt";
     dispatch({ type: "SAVE_CRR_ROUTE", route: crrRoute });
-    dispatch({ type: "RESET_SEARCH", route: crrRoute });
+    dispatch({ type: "RESET_PROMPT", route: crrRoute });
   }, [router.pathname, dispatch]);
 
   const [soundHovered, setSoundHovered] = useState(false);
@@ -628,7 +648,6 @@ const MusicPlayer = () => {
           onLoadedData={(e) => {
             const target = e.target as HTMLAudioElement;
             setDuration(target.duration);
-            setCrrSoundPerc(target.volume);
           }}
           onCanPlay={() => {
             // console.log("ON CANPLAY", e);
@@ -655,7 +674,6 @@ const MusicPlayer = () => {
               dispatch({
                 type: "SELECT_SONG",
                 position: "next",
-                songPos: crrPlayingSong.position,
               });
             }
           }}
@@ -928,7 +946,7 @@ const MusicPlayer = () => {
             <div className="mr-1 flex w-full items-center justify-end">
               <div className="relative flex w-full items-center justify-end">
                 <button
-                  className={cn("group p-2", scanning && "cursor-not-allowed")}
+                  className="group p-2"
                   disabled={scanning ?? false}
                   onClick={() => {
                     showToast("Coming Soon!", "warning");
@@ -937,14 +955,14 @@ const MusicPlayer = () => {
                   <MonitorSpeaker
                     className={cn(
                       "h-4 w-4",
-                      !scanning &&
-                        "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
-                      scanning && "text-slate-400"
+                      !scanning
+                        ? "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50"
+                        : "text-slate-400"
                     )}
                   />
                 </button>
                 <button
-                  className={cn("group p-2", scanning && "cursor-not-allowed")}
+                  className="group p-2"
                   onMouseEnter={() => setSoundHovered(true)}
                   onMouseLeave={() => setSoundHovered(false)}
                   disabled={scanning ?? false}
@@ -981,9 +999,9 @@ const MusicPlayer = () => {
                         <SoundIcon
                           className={cn(
                             "h-4 w-4",
-                            !scanning &&
-                              "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
-                            scanning && "text-slate-400"
+                            !scanning
+                              ? "text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50"
+                              : "text-slate-400"
                           )}
                         />
                       );
@@ -1071,28 +1089,36 @@ const PlaybackControls = ({ className }: { className?: string }) => {
 
       {/* backward button */}
       <button
-        className={cn(
-          "group p-3 md:p-2",
-          (scanning || firstSong) && "cursor-not-allowed text-slate-400"
-        )}
-        disabled={scanning || !!firstSong}
+        className="group p-3 md:p-2"
+        disabled={scanning || !!firstSong || !crrPlayingSong}
         onClick={() => {
-          if (crrPlayingSong && !firstSong) {
+          if (
+            state.crrRoute === "similar" &&
+            state.similar.scannedSong &&
+            state.crrPlayingSong?.position === -1
+          )
+            return;
+
+          if (
+            crrPlayingSong &&
+            !firstSong &&
+            !state[state.crrRoute].loadingMore
+          ) {
             dispatch({
               type: "SELECT_SONG",
               position: "prev",
-              songPos: crrPlayingSong.position,
             });
+
+            return;
           }
         }}
       >
         <SkipBack
           className={cn(
             "h-8 w-8 fill-current md:h-4 md:w-4",
-            !scanning &&
-              !firstSong &&
-              "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            (scanning || firstSong) && "fill-slate-400 md:text-slate-400"
+            scanning || !!firstSong || !crrPlayingSong
+              ? "fill-slate-400 md:text-slate-400"
+              : "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50"
           )}
         />
       </button>
@@ -1101,7 +1127,7 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       <PlayBttn
         className={cn(
           "relative m-1 rounded-full bg-white p-3.5 text-center md:p-2",
-          (scanning || !trackReady) && "cursor-not-allowed opacity-50",
+          (scanning || !trackReady) && "opacity-50",
           trackReady === false && "md:hover:scale-125 "
         )}
         LoadingIcon={() => (
@@ -1118,27 +1144,60 @@ const PlaybackControls = ({ className }: { className?: string }) => {
 
       {/* forward button */}
       <button
-        className={cn(
-          "group p-3 md:p-2",
-          scanning && "cursor-not-allowed text-slate-400"
-        )}
-        disabled={scanning}
+        className="group p-3 md:p-2"
+        disabled={
+          scanning ||
+          !crrPlayingSong ||
+          (!state[state.crrRoute].songsList
+            ?.slice(crrPlayingSong.position + 1)
+            .find((song) => song.audioSrc) &&
+            state[state.crrRoute].loadingMore)
+        }
         onClick={() => {
-          if (crrPlayingSong) {
-            dispatch({
-              type: "SELECT_SONG",
-              position: "next",
-              songPos: crrPlayingSong.position,
-            });
+          if (state[state.crrRoute].songsList) {
+            // if scanned song tries to forward, execute another case
+            if (
+              state.crrRoute === "similar" &&
+              state.similar.scannedSong &&
+              state.crrPlayingSong?.position === -1
+            ) {
+              dispatch({
+                type: "SELECT_SONG_FROM_SCANNED_SONG",
+                position: "next",
+              });
+
+              return;
+            }
+
+            if (
+              crrPlayingSong &&
+              !(
+                state[state.crrRoute].loadingMore &&
+                crrPlayingSong.position ===
+                  (state[state.crrRoute].songsList as PlayerSong[]).length - 1
+              )
+            ) {
+              dispatch({
+                type: "SELECT_SONG",
+                position: "next",
+              });
+
+              return;
+            }
           }
         }}
       >
         <SkipForward
           className={cn(
             "h-8 w-8 fill-current md:h-4 md:w-4",
-            !scanning &&
-              "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50",
-            scanning && "fill-slate-400 md:text-slate-400"
+            scanning ||
+              !crrPlayingSong ||
+              (!state[state.crrRoute].songsList
+                ?.slice(crrPlayingSong.position + 1)
+                .find((song) => song.audioSrc) &&
+                state[state.crrRoute].loadingMore)
+              ? "fill-slate-400 md:text-slate-400"
+              : "md:text-slate-800 md:group-hover:text-slate-900 md:dark:text-slate-300 md:dark:group-hover:text-slate-50"
           )}
         />
       </button>
@@ -1146,10 +1205,7 @@ const PlaybackControls = ({ className }: { className?: string }) => {
       {/* loop button */}
       {crrPlayingSong ? (
         <button
-          className={cn(
-            "group p-3 md:p-2",
-            scanning && "cursor-not-allowed text-slate-400"
-          )}
+          className={cn("group p-3 md:p-2", scanning && "text-slate-400")}
           onClick={() => dispatch({ type: "TOGGLE_LOOP" })}
         >
           <Repeat
@@ -1283,7 +1339,7 @@ export const ScanSimilarsBttn = ({
             index: validIndex as number,
             scanning: true,
           });
-          dispatch({ type: "RESET_SIMILAR_SONGS", onlyResQtt: true });
+          dispatch({ type: "RESET_SIMILAR", onlyResQtt: true });
         }
       }}
       className={!text ? "hidden xl:group-hover/track:block" : ""}
@@ -1339,11 +1395,7 @@ export const FavouriteBttn = ({
   return (
     <button
       {...props}
-      className={cn(
-        "p-2",
-        disabled && "cursor-not-allowed",
-        className ? className : ""
-      )}
+      className={cn("p-2", className ? className : "")}
       onClick={() => {
         if (songsList && !disabled) {
           !favourite && showToast("Coming Soon!", "warning");
@@ -1385,7 +1437,7 @@ const MyApp: AppType<{ session: Session | null }> = ({
           <MusicPlayerProvider>
             <Component {...pageProps} />
             <MusicPlayer />
-            {/* <ReactQueryDevtools initialIsOpen={true} /> */}
+            <ReactQueryDevtools initialIsOpen={true} />
           </MusicPlayerProvider>
         </SessionProvider>
       </ThemeProvider>

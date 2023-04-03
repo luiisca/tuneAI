@@ -30,12 +30,12 @@ import { shimmer, toBase64 } from "@/utils/blur-effect";
 import { formatSongDuration } from "@/utils/song-time";
 import { cn } from "@/utils/cn";
 import { SkeletonContainer, SkeletonText } from "@/components/ui/skeleton";
-import useLoadMore from "@/utils/hooks/useLoadMore";
 import { Button } from "@/components/ui/core/button";
 import { useRouter } from "next/router";
 import TabsList from "@/components/ui/tabsList";
 import showToast from "@/components/ui/core/notifications";
 import { TrackItem } from "@/components/track-item";
+import { loadMore } from "@/utils/load-more";
 
 type SpotifyTrackResultType = Omit<
   SongType,
@@ -161,7 +161,7 @@ const Similar = () => {
   const search = useCallback(
     (searchQuery: string) => {
       if (searchValue !== searchQuery) {
-        dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
+        dispatchPlayer({ type: "RESET_SIMILAR" });
         dispatch({ type: "RESET_SEARCH", searchValue: searchQuery });
       }
     },
@@ -226,8 +226,7 @@ const Similar = () => {
         return true;
       },
       onSuccess: (data) => {
-        similar.resPage === 1 &&
-          dispatchPlayer({ type: "RESET_SIMILAR_SONGS" });
+        similar.resPage === 1 && dispatchPlayer({ type: "RESET_SIMILAR" });
 
         const formatTracksForSongsList = (tracks: SongType[]) => {
           return tracks.map((track, index: number) => ({
@@ -290,7 +289,6 @@ const Similar = () => {
               }
             }
 
-            console.log("SIMILAR ONSUCCESS: Message ", data);
             if (data.message === LOADED_MORE_ERROR_MSG) {
               showToast(data.message as string, "success");
               dispatchPlayer({
@@ -323,22 +321,22 @@ const Similar = () => {
   }, [router.query.trackid, router.asPath]);
 
   useEffect(() => {
+    // FINISHES loading more similar tracks
     if (isFetched && !isFetching && similar.loadingMore) {
-      console.log("ABOUT TO stop loading more UE");
       dispatchPlayer({ type: "STOP_LOADING_MORE_SIMILAR" });
 
+      // FINISHES loading more similar tracks initiated by forward bttn
       const prevData = utils.discover.similar.getData({
         trackId: selectedTrack?.id as string,
         first: similar.resQtt - DEFAULT_RESULTS_QTT,
       }) as SongType[];
+
+      // go to next song as soon as new songs are loaded by forward button
       if (prevData && similar.forwardLoadingMore) {
         dispatchPlayer({
           type: "SELECT_SONG",
-          forwardLoadingMore: false,
-          songPos: prevData.length - 1,
           position: "next",
-          trackReady: true,
-          loadingMore: false,
+          forwardLoadingMore: false,
         });
       }
     }
@@ -352,18 +350,6 @@ const Similar = () => {
     similar.resQtt,
     utils.discover.similar,
   ]);
-
-  const [loadMore] = useLoadMore({
-    loadingMore: similar.loadingMore,
-    update: () =>
-      dispatchPlayer({
-        type: "SHOW_MORE_SIMILAR",
-      }),
-    isFetching,
-    isFetched,
-    allResultsShown: similar.allResultsShown,
-    resPage: similar.resPage,
-  });
 
   return (
     <Shell
@@ -415,11 +401,8 @@ const Similar = () => {
               ) {
                 if (selectedTrack.audioSrc) {
                   dispatchPlayer({
-                    type: "SELECT_SCANNED_SONG",
-                  });
-                  dispatchPlayer({
-                    type: "SELECT_SONG",
-                    songPos: selectedTrack.position,
+                    type: "SELECT_SONG_FROM_SCANNED_SONG",
+                    position: "crr",
                   });
                 } else {
                   showToast("Cannot play. Sorry", "error");
@@ -486,7 +469,6 @@ const Similar = () => {
         onValueChange={(value) => {
           if (!(value === "loading")) {
             const track = JSON.parse(value) as SpotifyTrackResultType;
-            console.log("ONVALUECHANGE SElECT", track);
             router
               .push({
                 pathname: router.pathname,
@@ -574,17 +556,28 @@ const Similar = () => {
                 "scrollbar-track-w-[80px] rounded-md scrollbar-thin scrollbar-track-transparent scrollbar-thumb-rounded-md",
                 "scrollbar-thumb-accent hover:scrollbar-thumb-accentBright"
               )}
-              onScroll={(e) => {
-                debounce((e: UIEvent<HTMLUListElement>) => {
-                  loadMore(e);
-                }, 1000)(e);
+              onScroll={debounce((e: UIEvent<HTMLUListElement>) => {
+                if (
+                  !similar.allResultsShown &&
+                  !similar.loadingMore &&
+                  !isFetching &&
+                  (isFetched || similar.resPage === 1)
+                ) {
+                  loadMore({
+                    e,
+                    update: () =>
+                      dispatchPlayer({
+                        type: "SHOW_MORE_SIMILAR",
+                      }),
+                  });
+                }
 
                 const target = e.target as HTMLUListElement;
                 setShowHeading(
                   Math.floor(target.scrollTop) >= 0 &&
                     Math.floor(target.scrollTop) <= 10
                 );
-              }}
+              }, 200)}
             >
               {tracks.map((track, index) => (
                 <TrackItem index={index} track={track} key={track.id} />
@@ -635,12 +628,12 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
       refetchOnReconnect: false,
       refetchOnMount: false,
       onSuccess: (data) => {
-        console.log("SPOTIFY LIST DATA", data);
+        // console.log("SPOTIFY LIST DATA", data);
         const prevData = utils.spotify.tracksList.getData({
           trackName: searchValue,
           offset: resPage * DEFAULT_RESULTS_QTT - DEFAULT_RESULTS_QTT,
         }) as unknown as SpotifyTrackResultType[];
-        console.log("PREV SPOTIFY LIST DATA", prevData);
+        // console.log("PREV SPOTIFY LIST DATA", prevData);
 
         utils.spotify.tracksList.setData(
           {
@@ -686,27 +679,27 @@ const SpotifySearchList = ({ state }: { state: typeof initialState }) => {
   }, [isFetched, isFetching, loadingMore]);
 
   const updateFn = useCallback(() => {
-    console.log("update fn run", resPage);
     setResPage(resPage + 1);
     setLoadingMore(true);
   }, [resPage]);
-
-  const [loadMore] = useLoadMore<HTMLDivElement>({
-    loadingMore,
-    update: updateFn,
-    isFetching,
-    isFetched,
-    allResultsShown: spotify.allResultsShown,
-    resPage: resPage,
-  });
 
   return (
     <SelectViewport
       className="p-1"
       ref={tracksListRef}
       onScroll={debounce((e: UIEvent<HTMLDivElement>) => {
-        loadMore(e);
-      }, 1000)}
+        if (
+          !spotify.allResultsShown &&
+          !spotify.loadingMore &&
+          !isFetching &&
+          isFetched
+        ) {
+          loadMore({
+            e,
+            update: updateFn,
+          });
+        }
+      }, 200)}
     >
       {/* without this the viewport would jump around while loading more (I think)*/}
       <SelectItem value="loading" className="h-0 p-0 opacity-0">

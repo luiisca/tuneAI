@@ -27,7 +27,6 @@ import { cn } from "@/utils/cn";
 import showToast from "@/components/ui/core/notifications";
 import { DEFAULT_RESULTS_QTT, LOADED_MORE_ERROR_MSG } from "@/utils/constants";
 import type { SongType } from "@/server/api/routers/discover";
-import useLoadMore from "@/utils/hooks/useLoadMore";
 import TabsList from "@/components/ui/tabsList";
 import { useRouter } from "next/router";
 import { TrackItem } from "@/components/track-item";
@@ -40,6 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown";
+import { loadMore } from "@/utils/load-more";
 
 export const ItemSkeleton = ({ time = true }: { time: boolean }) => {
   return (
@@ -97,7 +97,7 @@ const Prompt = () => {
   const search = useCallback(
     (searchQuery: string) => {
       if (searchValue !== searchQuery) {
-        dispatch({ type: "RESET_SEARCH" });
+        dispatch({ type: "RESET_PROMPT" });
         router
           .push({
             pathname: router.pathname,
@@ -205,16 +205,14 @@ const Prompt = () => {
         text: searchValue,
         first: prompt.resQtt - DEFAULT_RESULTS_QTT,
       }) as SongType[];
-      // console.log("prevData", prevData);
+
+      // go to next song as soon as new songs are loaded by forward button
       if (prevData && prompt.forwardLoadingMore) {
         // console.log("ISFETCHED, dispatching", prevData);
         dispatch({
           type: "SELECT_SONG",
-          forwardLoadingMore: false,
-          songPos: prevData.length - 1,
           position: "next",
-          trackReady: true,
-          loadingMore: false,
+          forwardLoadingMore: false,
         });
       }
     }
@@ -235,23 +233,10 @@ const Prompt = () => {
       const search = new URLSearchParams(query).get("search");
       if (search) {
         setSearchValue(search);
-        console.log("🚀update search!");
         setSearchEnabled(true);
       }
     }
   }, [router.asPath]);
-
-  const [loadMore] = useLoadMore<HTMLUListElement>({
-    loadingMore: prompt.loadingMore,
-    update: () =>
-      dispatch({
-        type: "SHOW_MORE_SIMILAR",
-      }),
-    isFetching,
-    isFetched,
-    allResultsShown: prompt.allResultsShown,
-    resPage: prompt.resPage,
-  });
 
   return (
     <Shell
@@ -360,7 +345,13 @@ const Prompt = () => {
               )}
               onScroll={(e) => {
                 debounce((e: UIEvent<HTMLUListElement>) => {
-                  loadMore(e);
+                  loadMore({
+                    e,
+                    update: () =>
+                      dispatch({
+                        type: "SHOW_MORE_SIMILAR",
+                      }),
+                  });
                 }, 1000)(e);
 
                 const target = e.target as HTMLUListElement;

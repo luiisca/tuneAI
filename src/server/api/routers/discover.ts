@@ -190,7 +190,9 @@ const getAiRecomSongs = async (text: string, first: number) => {
       "Content-Type": "application/json",
     },
   });
+  console.log("😲 getAiRecomSongs: res", res);
   const songsResult = (await res.json()) as SearchSongsResult;
+  console.log("😲 getAiRecomSongs: songsResult", songsResult);
 
   const NEW_SONGS_START_INDEX =
     first === DEFAULT_RESULTS_QTT ? 0 : first - DEFAULT_RESULTS_QTT;
@@ -411,6 +413,7 @@ export const discoverRouter = createTRPCRouter({
       const { session } = ctx;
       const { text, first } = input;
       let songs: SongType[] = [];
+      console.log("🎠running prompt proc");
 
       if (session) {
         const lastRecomSongs = await getAiRecomSongs(text, first);
