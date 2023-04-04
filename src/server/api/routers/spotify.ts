@@ -1,5 +1,6 @@
 import { env } from "@/env/server.mjs";
 import { DEFAULT_RESULTS_QTT } from "@/utils/constants";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, createTRPCRouter } from "../trpc";
 import { getAccessToken } from "../utils";
@@ -36,7 +37,7 @@ const getSpotifyTrack = async (trackId: string, refreshToken: string) => {
   return {
     id: data.id,
     position: -1,
-    favourite: false,
+    favorite: false,
     scanning: false,
     audioSrc: data.preview_url,
     title: data.name,
@@ -140,5 +141,49 @@ export const spotifyRouter = createTRPCRouter({
       }
 
       return [];
+    }),
+  toggleFavorite: protectedProcedure
+    .input(
+      z.object({
+        trackId: z.string(),
+        isFavorite: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { trackId, isFavorite } = input;
+      // throw new TRPCError({
+      //   code: "CONFLICT",
+      //   message: "NOPE",
+      // });
+
+      const accessToken = await getAccessToken(ctx.session.accessToken);
+      // SPOTIFY ERROR
+      if (!accessToken) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Access token failed",
+        });
+      }
+
+      const res = await fetch(`${env.SPOTIFY_API_ENDPOINT}/me/tracks`, {
+        method: isFavorite ? "DELETE" : "PUT",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ids: [trackId] }),
+      });
+
+      if (res.status == 200) {
+        return;
+      }
+
+      const data = (await res.json()) as SpotifyApi.ErrorObject;
+      if ("message" in data) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: data.message,
+        });
+      }
     }),
 });

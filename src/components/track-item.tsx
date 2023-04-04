@@ -1,6 +1,6 @@
 import Image from "next/image";
 import {
-  FavouriteBttn,
+  FavoriteBttn,
   MusicPlayerContext,
   ScanSimilarsBttn,
 } from "../pages/_app";
@@ -97,7 +97,7 @@ export const TrackItem = ({
           >
             <ExternalLink className="h-4 w-4 text-slate-600 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50" />
           </Link>
-          <FavouriteBttn
+          <FavoriteBttn
             className="group"
             iconClassName="h-4 w-4"
             songPos={index}

@@ -88,9 +88,9 @@ type ActionType =
       playing?: boolean;
     }
   | {
-      type: "TOGGLE_FAVOURITE";
+      type: "TOGGLE_FAVORITE";
       songPos: number;
-      favourite: boolean;
+      favorite: boolean;
     }
   | {
       type: "TOGGLE_LOOP";
@@ -138,7 +138,7 @@ export type PlayerSong = {
   scanning: boolean;
   artists: string[];
   coverUrl: string;
-  favourite: boolean;
+  favorite: boolean;
   audioSrc: string | null;
 };
 const playerPages = ["prompt", "similar"] as const;
@@ -291,7 +291,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         playing: action.playing ?? !state.playing,
       };
     }
-    case "TOGGLE_FAVOURITE": {
+    case "TOGGLE_FAVORITE": {
       if (state[state.crrRoute].songsList) {
         const newSongsList = state[state.crrRoute].songsList as PlayerSong[];
         const newSongItem = newSongsList[action.songPos];
@@ -299,7 +299,7 @@ const musicPlayerReducer = (state: InitStateType, action: ActionType) => {
         if (newSongItem) {
           newSongsList[action.songPos] = {
             ...newSongItem,
-            favourite: action.favourite,
+            favorite: action.favorite,
           };
         }
         return {
@@ -715,7 +715,7 @@ const MusicPlayer = () => {
                 {/* controls */}
                 <div className="absolute right-0 z-50 flex h-full">
                   {crrPlayingSong && (
-                    <FavouriteBttn songPos={crrPlayingSong.position} />
+                    <FavoriteBttn songPos={crrPlayingSong.position} />
                   )}
                   <PlayBttn
                     className={cn(
@@ -796,7 +796,7 @@ const MusicPlayer = () => {
                 />
               </div>
             )}
-            {/* title and favourite */}
+            {/* title and favorite */}
             {crrPlayingSong && (
               <div className="mx-3 mb-4 flex items-center">
                 <div className="w-full overflow-hidden">
@@ -816,7 +816,7 @@ const MusicPlayer = () => {
                     </>
                   )}
                 </div>
-                <FavouriteBttn
+                <FavoriteBttn
                   className="p-3 pr-0"
                   songPos={crrPlayingSong.position}
                 />
@@ -904,9 +904,9 @@ const MusicPlayer = () => {
                 </div>
               )}
 
-              {/* favourite */}
+              {/* favorite */}
               {crrPlayingSong && (
-                <FavouriteBttn
+                <FavoriteBttn
                   className="group"
                   iconClassName="h-4 w-4"
                   songPos={crrPlayingSong.position}
@@ -1368,7 +1368,7 @@ export const ScanSimilarsBttn = ({
   );
 };
 
-export const FavouriteBttn = ({
+export const FavoriteBttn = ({
   className,
   iconClassName,
   songPos,
@@ -1388,10 +1388,23 @@ export const FavouriteBttn = ({
       (songPos === 0 || (songPos && songPos > 0)) &&
       songsList[songPos]) ||
     crrPlayingSong;
+  const toggleFavoriteMutation = api.spotify.toggleFavorite.useMutation({
+    onMutate: async ({ isFavorite }) => {
+      console.log("💪running mutation!");
+      dispatch({ type: "TOGGLE_FAVORITE", songPos, favorite: !isFavorite });
+    },
+    onError: async (_, { isFavorite }) => {
+      // revert to original isFavorite value
+      console.log("🔴error mutation!");
+      dispatch({ type: "TOGGLE_FAVORITE", songPos, favorite: isFavorite });
+    },
+    onSuccess: async () => {
+      showToast("Added to favorite", "success");
+    },
+  });
 
-  // console.log("SONG", song);
   const scanning = song && song.scanning;
-  const favourite = song && song.favourite;
+  const favorite = song && song.favorite;
   const disabled = props.disabled || scanning;
 
   return (
@@ -1399,22 +1412,22 @@ export const FavouriteBttn = ({
       {...props}
       className={cn("p-2", className ? className : "")}
       onClick={() => {
-        if (songsList && !disabled) {
-          !favourite && showToast("Coming Soon!", "warning");
-          dispatch({ type: "TOGGLE_FAVOURITE", songPos, favourite: true });
-          setTimeout(() => {
-            dispatch({ type: "TOGGLE_FAVOURITE", songPos, favourite: false });
-          }, 1000);
+        if (songsList && !disabled && song) {
+          console.log("🖱favorite button cliecke!");
+          toggleFavoriteMutation.mutate({
+            trackId: song.id,
+            isFavorite: song.favorite,
+          });
         }
       }}
     >
       <Heart
         className={cn(
           !disabled &&
-            !favourite &&
+            !favorite &&
             "group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-50",
           disabled && "text-slate-400",
-          favourite && "fill-accent text-accent dark:text-accent",
+          favorite && "fill-accent text-accent dark:text-accent",
           iconClassName
         )}
       />

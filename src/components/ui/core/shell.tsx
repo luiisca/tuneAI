@@ -186,7 +186,7 @@ function UserDropdown({ small }: { small?: boolean }) {
 const navigation: NavigationItemType[] = [
   {
     name: "Discover",
-    href: "/discover/prompt",
+    href: "/discover/similar",
     icon: Compass,
   },
   {
@@ -313,7 +313,7 @@ function SideBar() {
       <div className="flex h-0 flex-1 flex-col pt-3 pb-4 lg:pt-5">
         <header className="items-center justify-between md:hidden lg:flex">
           <Link
-            href="/discover/prompt"
+            href="/discover/similar"
             className={cn(
               "flex w-full justify-center px-3 pr-12",
               mounted
@@ -331,7 +331,7 @@ function SideBar() {
         {/* logo icon for tablet */}
         <header className="items-center justify-between md:block lg:hidden ">
           <Link
-            href="/discover/prompt"
+            href="/discover/similar"
             className={cn(
               "text-center",
               mounted
@@ -485,7 +485,7 @@ function TopNav() {
         )}
       >
         <Link
-          href="/discover/prompt"
+          href="/discover/similar"
           className={cn(
             "w-32",
             mounted ? "cursor-pointer opacity-100" : "cursor-default opacity-0"

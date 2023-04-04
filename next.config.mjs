@@ -34,7 +34,7 @@ const config = {
     return [
       {
         source: "/discover",
-        destination: "/discover/prompt",
+        destination: "/discover/similar",
         permanent: true,
       },
     ];

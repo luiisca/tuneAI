@@ -269,7 +269,7 @@ const Similar = () => {
             artists: track.artists,
             scanning: false,
             coverUrl: track.coverUrl,
-            favourite: false, // @TODO: get them from spotify
+            favorite: false, // @TODO: get them from spotify
             audioSrc: track.previewUrl || "",
           }));
         };
@@ -520,7 +520,7 @@ const Similar = () => {
               track: {
                 ...track,
                 position: 0,
-                favourite: false,
+                favorite: false,
                 scanning: false,
                 audioSrc: track.previewUrl,
               },
