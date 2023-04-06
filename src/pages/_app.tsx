@@ -1398,8 +1398,13 @@ export const FavoriteBttn = ({
       console.log("🔴error mutation!");
       dispatch({ type: "TOGGLE_FAVORITE", songPos, favorite: isFavorite });
     },
-    onSuccess: async () => {
-      showToast("Added to favorite", "success");
+    onSuccess: async (_, { isFavorite }) => {
+      showToast(
+        isFavorite
+          ? "Removed from your Liked Songs"
+          : "Added to your Liked Songs",
+        "success"
+      );
     },
   });
 

@@ -15,37 +15,60 @@ const getSpotifyTrack = async (trackId: string, refreshToken: string) => {
     };
   }
 
-  const res = await fetch(`${env.SPOTIFY_API_ENDPOINT}/tracks/${trackId}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-  const data = (await res.json()) as
+  const trackRes = await fetch(
+    `${env.SPOTIFY_API_ENDPOINT}/tracks/${trackId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  const trackData = (await trackRes.json()) as
     | SpotifyApi.SingleTrackResponse
     | SpotifyApi.ErrorObject;
-  console.log("single track data", data);
+  console.log("single track data", trackData);
 
   // SPOTIFY ERROR
-  if ("message" in data) {
+  if ("message" in trackData) {
     return {
       code: "NOT_FOUND",
-      message: data.message,
+      message: trackData.message,
+    };
+  }
+
+  const favoritesRes = await fetch(
+    `${env.SPOTIFY_API_ENDPOINT}/me/tracks/contains?ids=${trackId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken || ""}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  const favoriteData = (await favoritesRes.json()) as
+    | SpotifyApi.CheckUsersSavedTracksResponse
+    | SpotifyApi.ErrorObject;
+  // SPOTIFY ERROR
+  if ("message" in favoriteData) {
+    return {
+      code: "NOT_FOUND",
+      message: favoriteData.message,
     };
   }
 
   return {
-    id: data.id,
+    id: trackData.id,
     position: -1,
-    favorite: false,
+    favorite: favoriteData[0],
     scanning: false,
-    audioSrc: data.preview_url,
-    title: data.name,
-    artists: data.artists.map((artist) => artist.name),
-    duration: data.duration_ms / 1000,
+    audioSrc: trackData.preview_url,
+    title: trackData.name,
+    artists: trackData.artists.map((artist) => artist.name),
+    duration: trackData.duration_ms / 1000,
     coverUrl:
-      data?.album?.images[0]?.url ||
-      data?.album?.images[1]?.url ||
+      trackData?.album?.images[0]?.url ||
+      trackData?.album?.images[1]?.url ||
       "/defaultSongCover.jpeg",
   };
 };

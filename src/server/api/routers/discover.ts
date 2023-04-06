@@ -114,6 +114,7 @@ interface enqueuedSpotifyTrack {
 
 export type SongType = {
   id: string;
+  favorite: boolean;
   spotifyUrl: string;
   title: string;
   artists: string[];
@@ -282,7 +283,7 @@ const enqueueSpotifyTrackAnalysis = async (trackID: string) => {
 
 const getSpotifyTracksData = async (tracksId: string, refreshToken: string) => {
   const accessToken = await getAccessToken(refreshToken);
-  const res = await fetch(
+  const tracksRes = await fetch(
     `${env.SPOTIFY_API_ENDPOINT}/tracks?ids=${tracksId}`,
     {
       headers: {
@@ -291,19 +292,42 @@ const getSpotifyTracksData = async (tracksId: string, refreshToken: string) => {
       },
     }
   );
-  const data = (await res.json()) as
+  const tracksData = (await tracksRes.json()) as
     | SpotifyApi.MultipleTracksResponse
     | SpotifyApi.ErrorObject;
-
   // SPOTIFY ERROR
-  if ("message" in data) {
+  if ("message" in tracksData) {
     return {
       code: "NOT_FOUND",
-      message: data.message,
+      message: tracksData.message,
     };
   }
 
-  return data.tracks;
+  const favoritesRes = await fetch(
+    `${env.SPOTIFY_API_ENDPOINT}/me/tracks/contains?ids=${tracksId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken || ""}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  const favoritesData = (await favoritesRes.json()) as
+    | SpotifyApi.CheckUsersSavedTracksResponse
+    | SpotifyApi.ErrorObject;
+  // SPOTIFY ERROR
+  if ("message" in favoritesData) {
+    return {
+      code: "NOT_FOUND",
+      message: favoritesData.message,
+    };
+  }
+  console.log("😍Favorites: ", favoritesData);
+
+  return favoritesData.map((favorite, pos) => ({
+    ...(tracksData.tracks[pos] as SpotifyApi.TrackObjectFull),
+    favorite,
+  }));
 };
 
 export const discoverRouter = createTRPCRouter({
@@ -372,28 +396,31 @@ export const discoverRouter = createTRPCRouter({
             return spotifyTracks;
           }
 
-          songs = spotifyTracks.map((track: SpotifyApi.TrackObjectFull) => {
-            const simSong = lastSimSongs.find(
-              (song) => song?.cursor === track.id
-            ) as SongResult;
+          songs = spotifyTracks.map(
+            (track: SpotifyApi.TrackObjectFull & { favorite: boolean }) => {
+              const simSong = lastSimSongs.find(
+                (song) => song?.cursor === track.id
+              ) as SongResult;
 
-            return {
-              id: simSong.cursor,
-              spotifyUrl: track?.external_urls.spotify,
-              genres: simSong.node.audioAnalysisV6.result.genreTags,
-              moods: simSong.node.audioAnalysisV6.result.moodTags,
-              instruments: simSong.node.audioAnalysisV6.result.instrumentTags,
-              musicalEra: simSong.node.audioAnalysisV6.result.musicalEraTag,
-              duration: track.duration_ms / 1000,
-              coverUrl:
-                track?.album?.images[0]?.url ||
-                track?.album?.images[1]?.url ||
-                "/defaultSongCover.jpeg",
-              previewUrl: track?.preview_url,
-              title: track.name,
-              artists: track.artists.map((artist) => artist.name),
-            };
-          });
+              return {
+                id: simSong.cursor,
+                favorite: track.favorite,
+                spotifyUrl: track?.external_urls.spotify,
+                genres: simSong.node.audioAnalysisV6.result.genreTags,
+                moods: simSong.node.audioAnalysisV6.result.moodTags,
+                instruments: simSong.node.audioAnalysisV6.result.instrumentTags,
+                musicalEra: simSong.node.audioAnalysisV6.result.musicalEraTag,
+                duration: track.duration_ms / 1000,
+                coverUrl:
+                  track?.album?.images[0]?.url ||
+                  track?.album?.images[1]?.url ||
+                  "/defaultSongCover.jpeg",
+                previewUrl: track?.preview_url,
+                title: track.name,
+                artists: track.artists.map((artist) => artist.name),
+              };
+            }
+          );
         }
       }
 
